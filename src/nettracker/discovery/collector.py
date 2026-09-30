@@ -6,6 +6,7 @@ from ipaddress import IPv4Network
 from typing import Literal
 
 from nettracker.db.repository import Repository
+from nettracker.discovery.merge import merge_candidates
 from nettracker.discovery.passive import Neighbor, read_neighbors
 from nettracker.discovery.scope import require_allowed_target
 from nettracker.discovery.vendor import lookup_vendor
@@ -57,6 +58,16 @@ def collect_observations(
                     if device.is_randomized_mac:
                         repo.set_status(device.id, "to_confirm")
                     repo.add_event(kind, created_at=clock(), device_id=device.id)
+                    if device.is_randomized_mac:
+                        candidate = repo.get_device(device.id)
+                        if candidate is not None:
+                            for existing_id in merge_candidates(candidate, repo.list_devices()):
+                                repo.add_event(
+                                    "merge_suggested",
+                                    created_at=clock(),
+                                    device_id=device.id,
+                                    details={"candidate_device_id": existing_id},
+                                )
                 repo.add_sighting(
                     device_id=device.id,
                     scan_id=scan_id,
