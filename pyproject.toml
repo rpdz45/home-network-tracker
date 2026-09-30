@@ -15,6 +15,7 @@ dependencies = [
     "uvicorn>=0.29",
     "jinja2>=3.1",
     "httpx>=0.27",
+    "pydantic>=2.5",
     "pydantic-settings>=2.2",
 ]
 
@@ -28,6 +29,9 @@ dev = [
     "pip-audit>=2.7",
     "pre-commit>=3.7",
 ]
+
+[project.scripts]
+nettracker = "nettracker.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nettracker"]
