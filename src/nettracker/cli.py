@@ -9,7 +9,8 @@ from pathlib import Path
 from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
-from nettracker.discovery.collector import collect_passive
+from nettracker.discovery.collector import collect_observations, collect_passive
+from nettracker.discovery.strategy import discover_with_fallback
 from nettracker.discovery.vendor import parse_ma_l_csv
 from nettracker.errors import ConfigError, NetTrackerError
 
@@ -18,7 +19,7 @@ logger = logging.getLogger("nettracker")
 COMMANDS = {
     "check-config": "Validate the configuration and print a summary (secrets are never shown).",
     "init-db": "Create or upgrade the SQLite database schema.",
-    "scan-once": "Read the local neighbor cache once and save in-scope observations.",
+    "scan-once": "Discover scoped neighbors once and save observations.",
 }
 
 
@@ -44,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
                 type=Path,
                 default=None,
                 help="optional local IEEE MA-L CSV file (no automatic download)",
+            )
+            sub.add_argument("--target", help="explicit RFC1918 IPv4 host or CIDR for active ARP")
+            sub.add_argument(
+                "--enable-active",
+                action="store_true",
+                help="explicitly authorize active ARP (requires scan.mode=active and --target)",
             )
     return parser
 
@@ -71,17 +78,44 @@ def _init_db(settings: Settings) -> int:
     return 0
 
 
-def _scan_once(settings: Settings, oui_file: Path | None = None) -> int:
-    if settings.scan.mode != "passive":
-        raise ConfigError(
-            "scan-once supports passive mode only; active discovery is not implemented"
-        )
+def _scan_once(
+    settings: Settings,
+    oui_file: Path | None = None,
+    target: str | None = None,
+    enable_active: bool = False,
+) -> int:
+    active = settings.scan.mode == "active"
+    if active and (not enable_active or target is None):
+        raise ConfigError("scan-once supports passive mode only unless --enable-active and --target are provided")
+    if not active and (enable_active or target is not None):
+        raise ConfigError("active ARP requires scan.mode=active, --enable-active and --target")
     vendors: dict[str, str] | None = None
     if oui_file is not None:
         try:
             vendors = parse_ma_l_csv(oui_file.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, ValueError) as exc:
             raise ConfigError(f"cannot load IEEE vendor file {oui_file}: {exc}") from exc
+    if active:
+        result = discover_with_fallback(
+            settings.allowed_subnets, target=target, active_enabled=True
+        )
+        mode = "passive" if result.degraded else "active"
+        if result.degraded:
+            print("Degraded mode: system neighbor cache only")
+        conn = connect(settings.database_path)
+        try:
+            migrate(conn)
+            count = collect_observations(
+                Repository(conn),
+                settings.allowed_subnets,
+                mode=mode,
+                reader=lambda _: result.neighbors,
+                vendors=vendors,
+            )
+        finally:
+            conn.close()
+        print(f"Discovery complete: {count} observation(s) from {result.source}")
+        return 0
     logger.warning("passive mode: system neighbor cache only; no network probes")
     conn = connect(settings.database_path)
     try:
@@ -113,7 +147,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _check_config(settings)
         if args.command == "init-db":
             return _init_db(settings)
-        return _scan_once(settings, args.oui_file)
+        return _scan_once(settings, args.oui_file, args.target, args.enable_active)
     except NetTrackerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
