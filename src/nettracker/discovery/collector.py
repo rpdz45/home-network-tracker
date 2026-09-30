@@ -58,7 +58,7 @@ def collect_observations(
                     if device.is_randomized_mac:
                         repo.set_status(device.id, "to_confirm")
                     repo.add_event(kind, created_at=clock(), device_id=device.id)
-                    if device.is_randomized_mac:
+                    if device.is_randomized_mac and hostname:
                         candidate = repo.get_device(device.id)
                         if candidate is not None:
                             for existing_id in merge_candidates(candidate, repo.list_devices()):
