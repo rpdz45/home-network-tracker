@@ -86,7 +86,7 @@ def _scan_once(
 ) -> int:
     active = settings.scan.mode == "active"
     if active and (not enable_active or target is None):
-        raise ConfigError("scan-once supports passive mode only unless --enable-active and --target are provided")
+        raise ConfigError("passive mode only; active requires --enable-active and --target")
     if not active and (enable_active or target is not None):
         raise ConfigError("active ARP requires scan.mode=active, --enable-active and --target")
     vendors: dict[str, str] | None = None
