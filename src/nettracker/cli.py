@@ -9,7 +9,7 @@ from pathlib import Path
 from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
-from nettracker.discovery.collector import collect_observations, collect_passive
+from nettracker.discovery.collector import ScanMode, collect_observations, collect_passive
 from nettracker.discovery.strategy import discover_with_fallback
 from nettracker.discovery.vendor import parse_ma_l_csv
 from nettracker.errors import ConfigError, NetTrackerError
@@ -99,7 +99,7 @@ def _scan_once(
         result = discover_with_fallback(
             settings.allowed_subnets, target=target, active_enabled=True
         )
-        mode = "passive" if result.degraded else "active"
+        mode: ScanMode = "passive" if result.degraded else "active"
         if result.degraded:
             print("Degraded mode: system neighbor cache only")
         conn = connect(settings.database_path)
