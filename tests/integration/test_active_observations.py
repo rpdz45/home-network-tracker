@@ -26,9 +26,7 @@ def test_explicit_active_observations_are_recorded_without_network(tmp_path: Pat
             )
             == 1
         )
-        assert tuple(conn.execute("SELECT mode, status FROM scans").fetchone()) == (
-            "active", "ok"
-        )
+        assert tuple(conn.execute("SELECT mode, status FROM scans").fetchone()) == ("active", "ok")
         assert len(repo.list_devices()) == 1
     finally:
         conn.close()
