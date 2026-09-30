@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
 from ipaddress import IPv4Network
+from typing import Literal
 
 from nettracker.db.repository import Repository
 from nettracker.discovery.passive import Neighbor, read_neighbors
@@ -42,7 +43,9 @@ def collect_passive(
                 new = device is None
                 device = repo.upsert_device(neighbor.mac, seen_at=clock())
                 if new:
-                    kind = "to_confirm" if device.is_randomized_mac else "new_device"
+                    kind: Literal["new_device", "to_confirm"] = (
+                        "to_confirm" if device.is_randomized_mac else "new_device"
+                    )
                     if device.is_randomized_mac:
                         repo.set_status(device.id, "to_confirm")
                     repo.add_event(kind, created_at=clock(), device_id=device.id)
