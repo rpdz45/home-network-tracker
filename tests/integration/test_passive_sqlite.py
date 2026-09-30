@@ -26,10 +26,7 @@ def test_real_sqlite_round_trip_and_repeated_discovery(tmp_path: Path) -> None:
             Neighbor("192.168.1.3", "02:11:22:33:44:66"),
         ]
         for _ in range(2):
-            assert (
-                collect_passive(repo, ALLOWED, reader=lambda _: entries, clock=lambda: NOW)
-                == 2
-            )
+            assert collect_passive(repo, ALLOWED, reader=lambda _: entries, clock=lambda: NOW) == 2
         assert len(repo.list_devices()) == 2
         assert [event.kind for event in repo.list_events()] == ["to_confirm", "new_device"]
         assert repo.list_devices("to_confirm")[0].mac == "02:11:22:33:44:66"
