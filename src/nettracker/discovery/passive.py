@@ -86,7 +86,7 @@ def read_neighbors(
         raise ScopeError("allowed_subnets must not be empty")
     for subnet in allowed_subnets:
         require_allowed_target(str(subnet), allowed_subnets)
-    command = ["arp", "-a"] if (platform or sys.platform) == "win32" else [
-        "ip", "-4", "neigh", "show"
-    ]
+    command = (
+        ["arp", "-a"] if (platform or sys.platform) == "win32" else ["ip", "-4", "neigh", "show"]
+    )
     return parse_neighbors(runner(command, timeout), allowed_subnets)
