@@ -8,14 +8,16 @@ from pathlib import Path
 
 from nettracker import __version__
 from nettracker.config import Settings, load_settings
-from nettracker.db import connect, migrate
-from nettracker.errors import NetTrackerError
+from nettracker.db import Repository, connect, migrate
+from nettracker.discovery.collector import collect_passive
+from nettracker.errors import ConfigError, NetTrackerError
 
 logger = logging.getLogger("nettracker")
 
 COMMANDS = {
     "check-config": "Validate the configuration and print a summary (secrets are never shown).",
     "init-db": "Create or upgrade the SQLite database schema.",
+    "scan-once": "Read the local neighbor cache once and save in-scope observations.",
 }
 
 
@@ -61,6 +63,20 @@ def _init_db(settings: Settings) -> int:
     return 0
 
 
+def _scan_once(settings: Settings) -> int:
+    if settings.scan.mode != "passive":
+        raise ConfigError("scan-once supports passive mode only; active discovery is not implemented")
+    logger.warning("passive mode: system neighbor cache only; no network probes")
+    conn = connect(settings.database_path)
+    try:
+        migrate(conn)
+        count = collect_passive(Repository(conn), settings.allowed_subnets)
+    finally:
+        conn.close()
+    print(f"Passive discovery complete: {count} observation(s) from the system neighbor cache")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -75,7 +91,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         if args.command == "check-config":
             return _check_config(settings)
-        return _init_db(settings)
+        if args.command == "init-db":
+            return _init_db(settings)
+        return _scan_once(settings)
     except NetTrackerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
