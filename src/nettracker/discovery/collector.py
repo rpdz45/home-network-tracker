@@ -1,6 +1,6 @@
 """Coordinate one passive discovery cycle and persist its results."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from typing import Literal
@@ -8,6 +8,7 @@ from typing import Literal
 from nettracker.db.repository import Repository
 from nettracker.discovery.passive import Neighbor, read_neighbors
 from nettracker.discovery.scope import require_allowed_target
+from nettracker.discovery.vendor import lookup_vendor
 
 Clock = Callable[[], datetime]
 Reader = Callable[[list[IPv4Network]], list[Neighbor]]
@@ -19,6 +20,7 @@ def collect_passive(
     *,
     reader: Reader = read_neighbors,
     clock: Clock = lambda: datetime.now(UTC),
+    vendors: Mapping[str, str] | None = None,
 ) -> int:
     """Read and store neighbor cache once; return count of distinct device observations.
 
@@ -41,7 +43,8 @@ def collect_passive(
                 seen.add(key)
                 device = repo.get_device_by_mac(neighbor.mac)
                 new = device is None
-                device = repo.upsert_device(neighbor.mac, seen_at=clock())
+                vendor = lookup_vendor(neighbor.mac, vendors) if vendors is not None else None
+                device = repo.upsert_device(neighbor.mac, seen_at=clock(), vendor=vendor)
                 if new:
                     kind: Literal["new_device", "to_confirm"] = (
                         "to_confirm" if device.is_randomized_mac else "new_device"
