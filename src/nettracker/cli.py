@@ -65,7 +65,9 @@ def _init_db(settings: Settings) -> int:
 
 def _scan_once(settings: Settings) -> int:
     if settings.scan.mode != "passive":
-        raise ConfigError("scan-once supports passive mode only; active discovery is not implemented")
+        raise ConfigError(
+            "scan-once supports passive mode only; active discovery is not implemented"
+        )
     logger.warning("passive mode: system neighbor cache only; no network probes")
     conn = connect(settings.database_path)
     try:
