@@ -6,10 +6,10 @@ from nettracker.discovery.vendor import lookup_vendor, parse_ma_l_csv
 
 CSV = (
     "Registry,Assignment,Organization Name,Organization Address\n"
-    'MA-L,001A2B,Example Devices Inc.,Example City\n'
-    'MA-L,ABCDEF,Private,\n'
-    'MA-M,001A2C,Other Inc.,Example City\n'
-    'MA-L,INVALID,Malformed Inc.,Example City\n'
+    "MA-L,001A2B,Example Devices Inc.,Example City\n"
+    "MA-L,ABCDEF,Private,\n"
+    "MA-M,001A2C,Other Inc.,Example City\n"
+    "MA-L,INVALID,Malformed Inc.,Example City\n"
 )
 
 
