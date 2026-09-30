@@ -36,7 +36,9 @@ def test_active_success_does_not_read_passive() -> None:
     assert not result.degraded
 
 
-def test_raw_arp_unavailable_uses_visible_passive_fallback(caplog: pytest.LogCaptureFixture) -> None:
+def test_raw_arp_unavailable_uses_visible_passive_fallback(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     def unavailable(target: str, subnets: list[IPv4Network]) -> list[Neighbor]:
         raise ActiveDiscoveryError("simulated missing privilege")
 
