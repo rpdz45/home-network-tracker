@@ -17,9 +17,19 @@ def test_accepts_explicit_private_targets(target: str) -> None:
 @pytest.mark.parametrize(
     "target",
     [
-        "8.8.8.8", "127.0.0.1", "169.254.1.1", "224.0.0.1", "192.168.2.1",
-        "192.168.0.0/16", "192.168.1.4/24", "::1", "fd00::1", "router.local",
-        "-sn 192.168.1.2", "", "192.168.1.0/24 --script default",
+        "8.8.8.8",
+        "127.0.0.1",
+        "169.254.1.1",
+        "224.0.0.1",
+        "192.168.2.1",
+        "192.168.0.0/16",
+        "192.168.1.4/24",
+        "::1",
+        "fd00::1",
+        "router.local",
+        "-sn 192.168.1.2",
+        "",
+        "192.168.1.0/24 --script default",
     ],
 )
 def test_refuses_public_other_subnet_invalid_and_ipv6(target: str) -> None:
