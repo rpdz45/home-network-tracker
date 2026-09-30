@@ -4,7 +4,13 @@ from ipaddress import IPv4Network
 
 import pytest
 
-from nettracker.discovery.passive import Neighbor, parse_neighbors, read_neighbors
+from nettracker.discovery.passive import (
+    Neighbor,
+    NeighborReadError,
+    parse_neighbors,
+    read_neighbors,
+    run_command,
+)
 from nettracker.discovery.scope import ScopeError
 
 ALLOWED = [IPv4Network("192.168.1.0/24")]
@@ -55,3 +61,8 @@ def test_runner_is_injected_and_never_called_on_empty_scope() -> None:
 def test_timeout_must_be_positive() -> None:
     with pytest.raises(ValueError, match="timeout"):
         read_neighbors(ALLOWED, timeout=0)
+
+
+def test_command_rejects_arbitrary_arguments_before_subprocess() -> None:
+    with pytest.raises(NeighborReadError, match="not allowed"):
+        run_command(["ip", "-4", "neigh", "show", "8.8.8.8"], 5)

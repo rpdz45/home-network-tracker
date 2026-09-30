@@ -13,6 +13,7 @@ from nettracker.errors import NetTrackerError
 _MAC = re.compile(r"(?i)\b([0-9a-f]{2}(?:[:-][0-9a-f]{2}){5})\b")
 _IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _MAC_ZERO = "00:00:00:00:00:00"
+_ALLOWED_COMMANDS = {("arp", "-a"), ("ip", "-4", "neigh", "show")}
 
 
 class NeighborReadError(NetTrackerError):
@@ -58,9 +59,12 @@ Runner = Callable[[list[str], float], str]
 
 
 def run_command(argv: list[str], timeout: float) -> str:
-    """Execute a fixed OS command without a shell. Override this in offline tests."""
+    """Execute only the two fixed neighbor-cache commands without a shell."""
+    if tuple(argv) not in _ALLOWED_COMMANDS:
+        raise NeighborReadError("neighbor-cache command is not allowed")
     try:
-        result = subprocess.run(
+        # Command arguments are validated above; no user-controlled target or shell is used.
+        result = subprocess.run(  # noqa: S603
             argv, check=True, capture_output=True, text=True, timeout=timeout
         )
     except (OSError, subprocess.SubprocessError) as exc:
