@@ -18,7 +18,8 @@ class ActiveDiscoveryError(NetTrackerError):
 def _send_arp(target: str, timeout: float) -> list[Neighbor]:
     """Send ARP through Scapy only after discover_arp validates the target."""
     try:
-        from scapy.all import ARP, Ether, srp
+        from scapy.layers.l2 import ARP, Ether
+        from scapy.sendrecv import srp
 
         answered, _ = srp(
             Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=target),
