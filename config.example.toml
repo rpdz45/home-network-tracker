@@ -1,0 +1,22 @@
+# Copy to config.toml and adapt. config.toml is ignored by Git.
+# Secrets (API token, webhooks...) never go here: use .env (see .env.example).
+
+# Only these private ranges (RFC 1918) may be scanned. Prefix /16 or longer.
+allowed_subnets = ["192.168.1.0/24"]
+
+database_path = "nettracker.db"
+log_level = "INFO"
+
+[scan]
+# "passive" reads the system ARP table; "active" sends ARP/ping probes (M2+).
+mode = "passive"
+interval_seconds = 60
+
+[alerts]
+# While true, no notification is ever sent.
+dry_run = true
+
+[api]
+# Keep loopback unless you set NETTRACKER_API_TOKEN in .env.
+host = "127.0.0.1"
+port = 8080

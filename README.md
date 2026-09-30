@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : jalon M0 (fondations).** Le dépôt contient la structure, l'outillage et la CI. Aucune fonctionnalité réseau n'est encore implémentée. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : jalon M1 (données et configuration).** La configuration, la base SQLite et la CLI de base fonctionnent. La découverte réseau (M2), le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -36,6 +36,29 @@ pre-commit install
 
 L'installation utilisateur par OS (service, Docker, tâche planifiée) sera documentée au jalon M6.
 
+## Configuration
+
+1. Copie `config.example.toml` vers `config.toml` et adapte `allowed_subnets` à ton réseau. Seules les plages privées RFC 1918 (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16) de préfixe /16 ou plus long sont acceptées.
+2. Si besoin, copie `.env.example` vers `.env` pour les secrets (jeton d'API, webhooks). `config.toml` et `.env` sont ignorés par Git.
+3. Vérifie la configuration :
+
+```bash
+nettracker check-config
+```
+
+Valeurs par défaut prudentes : mode passif, alertes en `dry-run`, API sur `127.0.0.1`. Toute écoute hors loopback exige un jeton (`NETTRACKER_API_TOKEN`). Le fichier de config se choisit avec `--config` ou la variable `NETTRACKER_CONFIG`. Priorité pour le jeton, le chemin de base et le niveau de log : variables d'environnement, puis `.env`, puis `config.toml`.
+
+## Commandes
+
+```bash
+nettracker --help
+nettracker --version
+nettracker check-config [--config CHEMIN]
+nettracker init-db [--config CHEMIN]
+```
+
+`init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque.
+
 ## Commandes qualité
 
 ```bash
@@ -48,10 +71,6 @@ pip-audit
 ```
 
 La CI GitHub exécute les mêmes contrôles sur Linux et Windows.
-
-## Configuration
-
-Copie `.env.example` vers `.env` et renseigne uniquement les canaux de notification utilisés. Le fichier `.env` est ignoré par Git. Les paramètres métier (`allowed_subnets`, mode passif ou actif, etc.) arrivent avec M1.
 
 ## Documentation
 
