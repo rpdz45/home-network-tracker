@@ -9,7 +9,8 @@ from nettracker.discovery.strategy import DiscoveryResult
 
 
 def test_active_requires_two_explicit_opt_ins_before_database(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     config = tmp_path / "config.toml"
     database = tmp_path / "devices.db"
@@ -55,8 +56,12 @@ def test_active_and_fallback_record_correct_mode(
     assert (
         main(
             [
-                "scan-once", "--config", str(config), "--enable-active",
-                "--target", "192.168.1.0/24",
+                "scan-once",
+                "--config",
+                str(config),
+                "--enable-active",
+                "--target",
+                "192.168.1.0/24",
             ]
         )
         == 0
