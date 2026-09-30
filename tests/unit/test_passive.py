@@ -66,3 +66,15 @@ def test_timeout_must_be_positive() -> None:
 def test_command_rejects_arbitrary_arguments_before_subprocess() -> None:
     with pytest.raises(NeighborReadError, match="not allowed"):
         run_command(["ip", "-4", "neigh", "show", "8.8.8.8"], 5)
+
+
+@pytest.mark.parametrize("failure", [FileNotFoundError, PermissionError])
+def test_os_failure_is_reported_without_real_subprocess(
+    monkeypatch: pytest.MonkeyPatch, failure: type[OSError]
+) -> None:
+    def fail(*args: object, **kwargs: object) -> None:
+        raise failure("simulated OS failure")
+
+    monkeypatch.setattr("nettracker.discovery.passive.subprocess.run", fail)
+    with pytest.raises(NeighborReadError, match="cannot read local neighbor cache"):
+        run_command(["ip", "-4", "neigh", "show"], 1)
