@@ -1,7 +1,7 @@
 """Read OS neighbor caches without transmitting discovery packets."""
 
 import re
-import subprocess
+import subprocess  # nosec B404 - required to read the OS cache with fixed commands only
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -63,8 +63,8 @@ def run_command(argv: list[str], timeout: float) -> str:
     if tuple(argv) not in _ALLOWED_COMMANDS:
         raise NeighborReadError("neighbor-cache command is not allowed")
     try:
-        # Command arguments are validated above; no user-controlled target or shell is used.
-        result = subprocess.run(  # noqa: S603
+        # Only exact allowlisted argv is accepted; no untrusted target or shell.
+        result = subprocess.run(  # noqa: S603  # nosec B603
             argv, check=True, capture_output=True, text=True, timeout=timeout
         )
     except (OSError, subprocess.SubprocessError) as exc:
