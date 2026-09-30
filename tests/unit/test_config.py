@@ -92,7 +92,7 @@ def test_scan_interval_has_a_lower_bound(tmp_path: Path) -> None:
 
 def test_exposed_api_requires_a_token(tmp_path: Path) -> None:
     path = write(tmp_path, VALID + '[api]\nhost = "0.0.0.0"\n')
-    with pytest.raises(ConfigError, match="api.token"):
+    with pytest.raises(ConfigError, match=r"api\.token"):
         load(path)
 
 
