@@ -34,9 +34,7 @@ def test_large_target_and_invalid_timeout_never_call_sender() -> None:
         return []
 
     with pytest.raises(ScopeError, match="256-address"):
-        discover_arp(
-            "192.168.0.0/16", [IPv4Network("192.168.0.0/16")], enabled=True, sender=sender
-        )
+        discover_arp("192.168.0.0/16", [IPv4Network("192.168.0.0/16")], enabled=True, sender=sender)
     with pytest.raises(ValueError, match="timeout"):
         discover_arp("192.168.1.0/24", ALLOWED, enabled=True, sender=sender, timeout=0)
     assert calls == []
