@@ -10,6 +10,7 @@ from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
 from nettracker.discovery.collector import collect_passive
+from nettracker.discovery.vendor import parse_ma_l_csv
 from nettracker.errors import ConfigError, NetTrackerError
 
 logger = logging.getLogger("nettracker")
@@ -37,6 +38,13 @@ def build_parser() -> argparse.ArgumentParser:
             default=None,
             help="path to the TOML config (default: $NETTRACKER_CONFIG or ./config.toml)",
         )
+        if name == "scan-once":
+            sub.add_argument(
+                "--oui-file",
+                type=Path,
+                default=None,
+                help="optional local IEEE MA-L CSV file (no automatic download)",
+            )
     return parser
 
 
@@ -63,16 +71,26 @@ def _init_db(settings: Settings) -> int:
     return 0
 
 
-def _scan_once(settings: Settings) -> int:
+def _scan_once(settings: Settings, oui_file: Path | None = None) -> int:
     if settings.scan.mode != "passive":
         raise ConfigError(
             "scan-once supports passive mode only; active discovery is not implemented"
         )
+    vendors: dict[str, str] | None = None
+    if oui_file is not None:
+        try:
+            vendors = parse_ma_l_csv(oui_file.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            raise ConfigError(f"cannot load IEEE vendor file {oui_file}: {exc}") from exc
     logger.warning("passive mode: system neighbor cache only; no network probes")
     conn = connect(settings.database_path)
     try:
         migrate(conn)
-        count = collect_passive(Repository(conn), settings.allowed_subnets)
+        repo = Repository(conn)
+        if vendors is None:
+            count = collect_passive(repo, settings.allowed_subnets)
+        else:
+            count = collect_passive(repo, settings.allowed_subnets, vendors=vendors)
     finally:
         conn.close()
     print(f"Passive discovery complete: {count} observation(s) from the system neighbor cache")
@@ -95,7 +113,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _check_config(settings)
         if args.command == "init-db":
             return _init_db(settings)
-        return _scan_once(settings)
+        return _scan_once(settings, args.oui_file)
     except NetTrackerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
