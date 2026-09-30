@@ -1,4 +1,4 @@
-"""Coordinate one passive discovery cycle and persist its results."""
+"""Coordinate discovery cycles and persist their results."""
 
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -12,24 +12,24 @@ from nettracker.discovery.vendor import lookup_vendor
 
 Clock = Callable[[], datetime]
 Reader = Callable[[list[IPv4Network]], list[Neighbor]]
+ScanMode = Literal["passive", "active"]
 
 
-def collect_passive(
+def collect_observations(
     repo: Repository,
     allowed_subnets: list[IPv4Network],
     *,
-    reader: Reader = read_neighbors,
+    mode: ScanMode,
+    reader: Reader,
     clock: Clock = lambda: datetime.now(UTC),
     vendors: Mapping[str, str] | None = None,
 ) -> int:
-    """Read and store neighbor cache once; return count of distinct device observations.
-
-    A failure is recorded as an unsuccessful scan and re-raised. No active discovery
-    backend is called. Caller must first initialize/migrate the database.
-    """
+    """Persist scoped observations from an already selected discovery reader."""
     if not allowed_subnets:
         raise ValueError("allowed_subnets must not be empty")
-    scan_id = repo.start_scan(mode="passive", started_at=clock())
+    if mode not in ("passive", "active"):
+        raise ValueError("unsupported discovery mode")
+    scan_id = repo.start_scan(mode=mode, started_at=clock())
     try:
         neighbors = reader(allowed_subnets)
         with repo.transaction():
@@ -65,3 +65,22 @@ def collect_passive(
     except Exception as exc:
         repo.finish_scan(scan_id, status="error", finished_at=clock(), error=type(exc).__name__)
         raise
+
+
+def collect_passive(
+    repo: Repository,
+    allowed_subnets: list[IPv4Network],
+    *,
+    reader: Reader = read_neighbors,
+    clock: Clock = lambda: datetime.now(UTC),
+    vendors: Mapping[str, str] | None = None,
+) -> int:
+    """Read the system neighbor cache only, without any active discovery backend."""
+    return collect_observations(
+        repo,
+        allowed_subnets,
+        mode="passive",
+        reader=reader,
+        clock=clock,
+        vendors=vendors,
+    )
