@@ -1,11 +1,14 @@
-"""CLI name resolution is explicit and tested without DNS or neighbor-cache access."""
+"""CLI name resolution tests use simulated observations and DNS."""
 
+from collections.abc import Mapping
+from ipaddress import IPv4Network
 from pathlib import Path
 
 import pytest
 
 from nettracker.cli import main
 from nettracker.db import Repository, connect
+from nettracker.discovery.collector import HostnameLookup, collect_passive
 from nettracker.discovery.passive import Neighbor
 
 
@@ -29,30 +32,35 @@ def test_cli_names_are_opt_in(
         encoding="utf-8",
     )
     calls: list[str] = []
+    expected_scope = [IPv4Network("192.168.1.0/24")]
 
-    def fake_reverse(ip: str, subnets: object, *, enabled: bool) -> str:
+    def fake_reverse(ip: str, subnets: list[IPv4Network], *, enabled: bool) -> str:
         assert enabled
+        assert subnets == expected_scope
         calls.append(ip)
         return "fixture.example"
 
-    def fake_command(argv: list[str], timeout: float) -> str:
-        return "192.168.1.2 dev eth0 lladdr 00:11:22:33:44:55 REACHABLE"
-
-    def fake_reader(subnets: object) -> list[Neighbor]:
+    def fake_reader(subnets: list[IPv4Network]) -> list[Neighbor]:
+        assert subnets == expected_scope
         return [Neighbor("192.168.1.2", "00:11:22:33:44:55")]
 
-    monkeypatch.setattr("nettracker.cli.reverse_hostname", fake_reverse)
-    monkeypatch.setattr("nettracker.discovery.passive.subprocess.run", pytest.fail)
-    from nettracker.discovery.collector import collect_passive
-
-    def fake_collect(repo: Repository, subnets: object, **kwargs: object) -> int:
+    def fake_collect(
+        repo: Repository,
+        subnets: list[IPv4Network],
+        *,
+        vendors: Mapping[str, str] | None = None,
+        hostname_lookup: HostnameLookup | None = None,
+    ) -> int:
+        assert (hostname_lookup is not None) == enabled
         return collect_passive(
             repo,
-            [__import__("ipaddress").IPv4Network("192.168.1.0/24")],
+            subnets,
             reader=fake_reader,
-            **kwargs,
+            vendors=vendors,
+            hostname_lookup=hostname_lookup,
         )
 
+    monkeypatch.setattr("nettracker.cli.reverse_hostname", fake_reverse)
     monkeypatch.setattr("nettracker.cli.collect_passive", fake_collect)
     args = ["scan-once", "--config", str(config)]
     if enabled:
@@ -61,8 +69,7 @@ def test_cli_names_are_opt_in(
     assert calls == (["192.168.1.2"] if enabled else [])
     conn = connect(database)
     try:
-        assert Repository(conn).list_devices()[0].hostname == (
-            "fixture.example" if enabled else None
-        )
+        hostname = Repository(conn).list_devices()[0].hostname
+        assert hostname == ("fixture.example" if enabled else None)
     finally:
         conn.close()
