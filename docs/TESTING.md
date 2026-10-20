@@ -38,3 +38,10 @@ Ouvre une issue `bug: ...` avec : OS et version, version de Python, commit (`git
 Testé hors ligne par la CI : garde-fous de périmètre, cache de voisins simulé, ARP actif simulé avec repli, persistance SQLite, fabricants OUI, résolution de noms injectée et dédoublonnage persistant des suggestions de rapprochement. Ces tests n’émettent aucun paquet réel.
 
 Non testé sur matériel réel : Npcap sous Windows, `CAP_NET_RAW` ou root sous Linux/Raspberry Pi OS, comportement du résolveur DNS du propriétaire, cohérence avec la liste de la box et fonctionnement continu. Les transitions en ligne/hors ligne, les alertes et la reprise automatique appartiennent aux jalons suivants.
+
+
+## Repli nmap M2
+
+`tests/unit/test_nmap.py` remplace tous les sous-processus et utilise du XML fictif. Il couvre les refus de cible avant appel, le délai, les options fixes sans shell, les erreurs de processus, le XML malformé ou dangereux, les résultats hors cible, les doublons et les MAC absentes ou invalides. `tests/unit/test_strategy.py` couvre l’ordre des replis et l’absence de nmap sans opt-in.
+
+`tests/integration/test_nmap_cli.py` raccorde CLI, stratégie et SQLite avec ARP et nmap simulés : transmission du délai, source dégradée, scan persisté en mode actif, statut `to_confirm` pour MAC locale et mode passif inchangé. Aucun scan réel n’est exécuté. La validation sur Windows/Npcap, Linux/Raspberry Pi et sur le réseau autorisé du propriétaire reste à réaliser.

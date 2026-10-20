@@ -11,6 +11,10 @@ log_level = "INFO"
 # "passive" reads the system ARP table; "active" sends ARP/ping probes (M2+).
 mode = "passive"
 interval_seconds = 60
+# Optional fallback after raw ARP fails; still requires active mode and CLI opt-in.
+nmap_fallback = false
+# Total subprocess timeout, between 1 and 120 seconds.
+nmap_timeout_seconds = 30
 
 [alerts]
 # While true, no notification is ever sent.

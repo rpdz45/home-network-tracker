@@ -30,3 +30,10 @@ Copie `.env.example` vers `.env`. Ne committe jamais `.env`. Si un secret est pu
 ## Signaler un problème
 
 Dépôt privé : ouvre une issue avec le label `role:securite`, sans y coller de secret ni de données du foyer.
+
+
+## Repli nmap M2
+
+Le repli est désactivé par défaut et exige `scan.nmap_fallback`, le mode actif, l’option CLI active et une cible explicite privée autorisée, limitée à 256 adresses. Les arguments sont fixes et passés sans shell ; aucun scan de ports, script ou détection de services n’est demandé. Le binaire doit provenir d’une installation de confiance : il est résolu dans le `PATH`, sans élévation automatique des droits.
+
+Le délai du sous-processus est configurable entre 1 et 120 secondes. La sortie est contrôlée après capture (1 Mio de caractères), puis analysée avec `defusedxml` sans entités ni références externes. Les IP retournées hors cible provoquent une erreur et non un repli ; les MAC multicast, nulles ou mal formées ne sont pas persistées. Cette limite après capture ne constitue pas une protection contre la consommation de mémoire d’un binaire compromis. L’absence de nmap, les erreurs de droits et les délais dépassés sont signalés avant retour au cache passif. Aucun privilège n’est ajouté automatiquement ; pas de validation sur LAN ou matériel réel.
