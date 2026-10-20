@@ -27,8 +27,7 @@ def test_cli_names_are_opt_in(
     config = tmp_path / "config.toml"
     database = tmp_path / "devices.db"
     config.write_text(
-        'allowed_subnets = ["192.168.1.0/24"]\n'
-        f'database_path = "{database.as_posix()}"\n',
+        f'allowed_subnets = ["192.168.1.0/24"]\ndatabase_path = "{database.as_posix()}"\n',
         encoding="utf-8",
     )
     calls: list[str] = []
