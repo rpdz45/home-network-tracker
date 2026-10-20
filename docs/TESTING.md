@@ -45,3 +45,9 @@ Non testé sur matériel réel : Npcap sous Windows, `CAP_NET_RAW` ou root sous 
 `tests/unit/test_nmap.py` remplace tous les sous-processus et utilise du XML fictif. Il couvre les refus de cible avant appel, le délai, les options fixes sans shell, les erreurs de processus, le XML malformé ou dangereux, les résultats hors cible, les doublons et les MAC absentes ou invalides. `tests/unit/test_strategy.py` couvre l’ordre des replis et l’absence de nmap sans opt-in.
 
 `tests/integration/test_nmap_cli.py` raccorde CLI, stratégie et SQLite avec ARP et nmap simulés : transmission du délai, source dégradée, scan persisté en mode actif, statut `to_confirm` pour MAC locale et mode passif inchangé. Aucun scan réel n’est exécuté. La validation sur Windows/Npcap, Linux/Raspberry Pi et sur le réseau autorisé du propriétaire reste à réaliser.
+
+## Liste blanche M2
+
+`tests/unit/test_known_devices.py` vérifie le défaut vide, la normalisation, les doublons, les adresses invalides/nulles/multicast, les erreurs avant ouverture SQLite et le résumé sans MAC. `tests/integration/test_known_observations.py` vérifie les nouveaux appareils et les promotions, les statuts ignorés/fusionnés, le retrait sans révocation, la réouverture SQLite, le périmètre avec rollback, l’absence de précréation et l’absence de suggestions pour les appareils approuvés.
+
+Le raccordement CLI est testé avec résultats ARP, nmap et cache simulés, DNS injecté et CSV OUI fictif. Aucun test ne lit le réseau du propriétaire ni ne lance de sonde réelle ; les backends ne sont pas validés sur matériel. Pour vérifier seulement la configuration locale sans scan : `nettracker check-config --config config.toml`. La sortie attendue contient le nombre de MAC configurées, jamais leur liste.

@@ -10,7 +10,7 @@ Un CSV IEEE MA-L local peut être fourni avec `--oui-file CHEMIN` dans les deux 
 
 La résolution DNS inverse est désactivée par défaut. `--resolve-names` l'active uniquement après validation de l'adresse dans `allowed_subnets` ; le résolveur système peut néanmoins émettre des requêtes DNS hors du LAN. Lorsqu'une MAC aléatoire au statut `to_confirm` partage un nom avec un appareil connu plus ancien et que leurs périodes observées ne se chevauchent pas, un événement `merge_suggested` est créé une seule fois par paire. Le mécanisme fonctionne aussi si le nom n'est obtenu qu'à un passage ultérieur. Il ne fusionne jamais automatiquement les appareils et n'envoie aucune notification.
 
-Les tests utilisent des lecteurs simulés, des adresses inventées et SQLite temporaire : ils n'émettent aucun paquet et ne vérifient pas Npcap ni les droits Linux réels. Le repli est visible dans la sortie console et les logs, pas encore dans un dashboard. mDNS, la liste blanche `known_devices`, la validation sur Windows/Linux/Raspberry Pi et la vérification sur le réseau autorisé du propriétaire restent à faire avant de déclarer M2 complet.
+Les tests utilisent des lecteurs simulés, des adresses inventées et SQLite temporaire : ils n'émettent aucun paquet et ne vérifient pas Npcap ni les droits Linux réels. Le repli est visible dans la sortie console et les logs, pas encore dans un dashboard. mDNS, la validation sur Windows/Linux/Raspberry Pi et la vérification sur le réseau autorisé du propriétaire restent à faire avant de déclarer M2 complet.
 
 
 ## Repli nmap optionnel
@@ -22,3 +22,9 @@ La commande utilise uniquement les options fixes `-sn -n --max-rate 10 --max-ret
 Une réussite affiche `Degraded mode: nmap host discovery fallback (active)` et la source `active_nmap` ; SQLite enregistre alors le scan en mode actif. Si nmap est absent, refuse les droits, dépasse le délai ou produit un XML inexploitable, le cache système reste le dernier repli visible. Une erreur de périmètre se propage sans autre tentative.
 
 Le XML doit annoncer une fin réussie. Les entités XML et références externes sont interdites ; au-delà de 1 Mio de caractères la sortie est refusée. Cette limite est vérifiée après capture et ne borne donc pas la mémoire du sous-processus ni sa sortie pendant l’exécution. Les adresses IPv4 retournées doivent appartenir à la cible exacte ; seules les MAC unicast valides sont retenues. Les hôtes sans MAC exploitable sont signalés et, si aucun hôte en ligne n’a de MAC utilisable, le cache est tenté. Les hôtes IPv6 seuls ne sont pas pris en charge. Aucun appel nmap réel, ni validation Npcap ou privilèges sur matériel, n’a été réalisé.
+
+## Liste blanche locale
+
+`known_devices` est une liste racine de MAC unicast non nulles, vide par défaut. À chaque passage, après validation de l’IP dans `allowed_subnets`, une MAC explicitement listée reçoit `known`. La MAC reste marquée localement administrée si son bit correspondant est présent ; ce n’est ni une preuve d’identité ni une fusion. Aucun événement `new_device`, `to_confirm` ou suggestion de fusion n’est créé pour cet appareil approuvé ; les événements historiques ne sont pas effacés. Les voisins non listés conservent le comportement antérieur.
+
+La liste ne crée ni appareil absent du cache/résultat ni nouvelle cible de scan. `ignored` et `merged_into` restent prioritaires, sans réactivation. La confiance persistée est volontairement non révoquée par le retrait d’une entrée ; le reclassement manuel n’a pas encore de commande utilisateur. Aucun alias ou hostname n’accorde de confiance. La configuration normalise majuscules/tirets et refuse les doublons ; le collecteur revalide aussi les appels directs. Les tests sont simulés, pas validés sur un LAN réel.
