@@ -10,6 +10,7 @@ from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
 from nettracker.discovery.collector import ScanMode, collect_observations, collect_passive
+from nettracker.discovery.names import reverse_hostname
 from nettracker.discovery.strategy import discover_with_fallback
 from nettracker.discovery.vendor import parse_ma_l_csv
 from nettracker.errors import ConfigError, NetTrackerError
@@ -40,6 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
             help="path to the TOML config (default: $NETTRACKER_CONFIG or ./config.toml)",
         )
         if name == "scan-once":
+            sub.add_argument(
+                "--resolve-names",
+                action="store_true",
+                help="opt in to reverse DNS via the system resolver (may send DNS queries)",
+            )
             sub.add_argument(
                 "--oui-file",
                 type=Path,
@@ -83,6 +89,7 @@ def _scan_once(
     oui_file: Path | None = None,
     target: str | None = None,
     enable_active: bool = False,
+    resolve_names: bool = False,
 ) -> int:
     active = settings.scan.mode == "active"
     if active and (not enable_active or target is None):
@@ -95,6 +102,12 @@ def _scan_once(
             vendors = parse_ma_l_csv(oui_file.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, ValueError) as exc:
             raise ConfigError(f"cannot load IEEE vendor file {oui_file}: {exc}") from exc
+
+    def lookup(ip: str) -> str | None:
+        return reverse_hostname(ip, settings.allowed_subnets, enabled=True)
+
+    if resolve_names:
+        logger.warning("reverse DNS enabled: system resolver may send queries outside the LAN")
     if active:
         result = discover_with_fallback(
             settings.allowed_subnets, target=target, active_enabled=True
@@ -111,17 +124,22 @@ def _scan_once(
                 mode=mode,
                 reader=lambda _: result.neighbors,
                 vendors=vendors,
+                hostname_lookup=lookup if resolve_names else None,
             )
         finally:
             conn.close()
         print(f"Discovery complete: {count} observation(s) from {result.source}")
         return 0
-    logger.warning("passive mode: system neighbor cache only; no network probes")
+    logger.warning("passive discovery: system neighbor cache only; no ARP probes")
     conn = connect(settings.database_path)
     try:
         migrate(conn)
         repo = Repository(conn)
-        if vendors is None:
+        if resolve_names:
+            count = collect_passive(
+                repo, settings.allowed_subnets, vendors=vendors, hostname_lookup=lookup
+            )
+        elif vendors is None:
             count = collect_passive(repo, settings.allowed_subnets)
         else:
             count = collect_passive(repo, settings.allowed_subnets, vendors=vendors)
@@ -147,7 +165,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _check_config(settings)
         if args.command == "init-db":
             return _init_db(settings)
-        return _scan_once(settings, args.oui_file, args.target, args.enable_active)
+        return _scan_once(
+            settings, args.oui_file, args.target, args.enable_active, args.resolve_names
+        )
     except NetTrackerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
