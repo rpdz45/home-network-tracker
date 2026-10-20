@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : jalon M2 (découverte) en cours.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, les fabricants OUI locaux, la résolution DNS inverse optionnelle et les suggestions prudentes pour MAC aléatoires fonctionnent. Le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : jalon M2 (découverte) en cours.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse optionnelle et les suggestions prudentes pour MAC aléatoires fonctionnent. Le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -11,6 +11,7 @@ Ne scanne que **tes propres réseaux**. N'utilise jamais cet outil sur un résea
 ## Prérequis
 
 - Python 3.11 ou plus.
+- Facultatif : binaire `nmap` installé et disponible dans le `PATH` pour le repli actif explicitement activé.
 - Windows : Npcap sera requis pour l'ARP brut (scapy) à partir de M2.
 - Linux / Raspberry Pi OS : root ou la capacité `CAP_NET_RAW` sera requis pour l'ARP brut à partir de M2.
 
@@ -58,7 +59,7 @@ nettracker init-db [--config CHEMIN]
 nettracker scan-once [--config CHEMIN] [--resolve-names] [--oui-file CHEMIN]
 ```
 
-`init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque. `scan-once` lit le cache de voisins par défaut. La résolution DNS inverse reste désactivée sans `--resolve-names` et peut émettre des requêtes via le résolveur système. Le mode ARP actif exige en plus `scan.mode = "active"`, `--enable-active` et une cible `--target` explicitement autorisée. Voir [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md).
+`init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque. `scan-once` lit le cache de voisins par défaut. La résolution DNS inverse reste désactivée sans `--resolve-names` et peut émettre des requêtes via le résolveur système. Le mode ARP actif exige en plus `scan.mode = "active"`, `--enable-active` et une cible `--target` explicitement autorisée. Le repli nmap reste désactivé sans `scan.nmap_fallback = true` ; il ne sert qu’après un échec de l’ARP brut et conserve les mêmes garde-fous de cible. Voir [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md).
 
 ## Commandes qualité
 

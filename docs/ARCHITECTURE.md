@@ -13,8 +13,8 @@ Document de conception du jalon M0. Aucune logique métier n'est encore écrite 
    |                                    |
 +--v-----------+                 +------v------+
 |  Collecteur  |                 |  API + Web  |  FastAPI, 127.0.0.1 par défaut
-| discovery/   |                 |  api/ web/  |
-| monitor/     |                 +------^------+
+| discovery/   |                 +------^------+
+| monitor/     |                        |
 +--+-----------+                        |
    |   événements              lecture    |
    |                                    |
@@ -147,3 +147,12 @@ Ces points sont ajoutés sans changer les règles d'`AGENTS.md` ; ils tiennent c
 ## 8. Reporté après la v0.1
 
 Suivi de la bande passante, découverte IPv6 (NDP), export CSV et rapport périodique, comptes multi-utilisateurs. Une fonctionnalité qui ne tient pas dans une colonne, un écran ou un module est reportée en issue `v0.2`.
+
+
+## Décision M2 : repli nmap
+
+Le backend `discovery/nmap.py` expose un lecteur injecté pour les tests. La stratégie suit ARP brut → nmap explicitement activé → cache système. Par défaut nmap reste désactivé, même en mode actif ; un succès ARP vide ne déclenche pas de nouvelle sonde. Les erreurs de périmètre interrompent la chaîne.
+
+Nmap utilise le XML avec analyse protégée (`defusedxml`), une cible IPv4 RFC1918 littérale autorisée de 256 adresses au maximum, des arguments fixes sans shell et un délai configurable borné. La source `active_nmap` est dégradée par rapport au backend primaire, mais son mode de persistance reste actif. Le schéma SQLite est inchangé ; la source détaillée demeure affichée en console et dans les logs plutôt que stockée dans une nouvelle colonne.
+
+Alternative écartée : activer automatiquement nmap dès que l’ARP échoue. Un opt-in supplémentaire évite d’émettre à l’insu du propriétaire des sondes TCP/ICMP lorsque les paquets bruts ne sont pas autorisés. Les scans de ports, les scripts et les services restent hors périmètre. Suivi : issue #9.
