@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : jalon M1 (données et configuration).** La configuration, la base SQLite et la CLI de base fonctionnent. La découverte réseau (M2), le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : jalon M2 (découverte) en cours.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, les fabricants OUI locaux, la résolution DNS inverse optionnelle et les suggestions prudentes pour MAC aléatoires fonctionnent. Le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -55,9 +55,10 @@ nettracker --help
 nettracker --version
 nettracker check-config [--config CHEMIN]
 nettracker init-db [--config CHEMIN]
+nettracker scan-once [--config CHEMIN] [--resolve-names] [--oui-file CHEMIN]
 ```
 
-`init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque.
+`init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque. `scan-once` lit le cache de voisins par défaut. La résolution DNS inverse reste désactivée sans `--resolve-names` et peut émettre des requêtes via le résolveur système. Le mode ARP actif exige en plus `scan.mode = "active"`, `--enable-active` et une cible `--target` explicitement autorisée. Voir [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md).
 
 ## Commandes qualité
 
@@ -77,6 +78,7 @@ La CI GitHub exécute les mêmes contrôles sur Linux et Windows.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/TESTING.md](docs/TESTING.md)
+- [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md)
 - [AGENTS.md](AGENTS.md) : règles de travail pour les agents IA
 
 ## Licence

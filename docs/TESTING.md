@@ -33,6 +33,8 @@ Sur ton réseau uniquement, jamais sur un réseau professionnel sans accord écr
 
 Ouvre une issue `bug: ...` avec : OS et version, version de Python, commit (`git rev-parse --short HEAD`), commande exacte, extrait de config sans secrets, logs complets en niveau DEBUG, résultat attendu et obtenu.
 
-## État du jalon M0
+## État du jalon M2
 
-Testé par la CI : import du paquet et présence d'une version. Non testé sur matériel réel : rien de réseau n'existe encore.
+Testé hors ligne par la CI : garde-fous de périmètre, cache de voisins simulé, ARP actif simulé avec repli, persistance SQLite, fabricants OUI, résolution de noms injectée et dédoublonnage persistant des suggestions de rapprochement. Ces tests n’émettent aucun paquet réel.
+
+Non testé sur matériel réel : Npcap sous Windows, `CAP_NET_RAW` ou root sous Linux/Raspberry Pi OS, comportement du résolveur DNS du propriétaire, cohérence avec la liste de la box et fonctionnement continu. Les transitions en ligne/hors ligne, les alertes et la reprise automatique appartiennent aux jalons suivants.
