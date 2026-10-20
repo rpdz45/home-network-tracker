@@ -47,6 +47,8 @@ class ScanSettings(_Model):
 
     mode: Literal["passive", "active"] = "passive"
     interval_seconds: int = Field(default=60, ge=10, le=86_400)
+    nmap_fallback: bool = False
+    nmap_timeout_seconds: float = Field(default=30.0, ge=1, le=120, allow_inf_nan=False)
 
 
 class AlertSettings(_Model):

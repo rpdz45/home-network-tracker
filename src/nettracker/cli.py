@@ -110,11 +110,18 @@ def _scan_once(
         logger.warning("reverse DNS enabled: system resolver may send queries outside the LAN")
     if active:
         result = discover_with_fallback(
-            settings.allowed_subnets, target=target, active_enabled=True
+            settings.allowed_subnets,
+            target=target,
+            active_enabled=True,
+            nmap_enabled=settings.scan.nmap_fallback,
+            nmap_timeout=settings.scan.nmap_timeout_seconds,
         )
-        mode: ScanMode = "passive" if result.degraded else "active"
+        mode: ScanMode = "passive" if result.source == "system_neighbor_cache" else "active"
         if result.degraded:
-            print("Degraded mode: system neighbor cache only")
+            if result.source == "active_nmap":
+                print("Degraded mode: nmap host discovery fallback (active)")
+            else:
+                print("Degraded mode: system neighbor cache only")
         conn = connect(settings.database_path)
         try:
             migrate(conn)
