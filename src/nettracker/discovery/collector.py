@@ -1,11 +1,12 @@
 """Coordinate discovery cycles and persist their results."""
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from typing import Literal
 
-from nettracker.db.repository import Repository
+from nettracker.db.repository import Repository, normalize_mac
+from nettracker.discovery.known import normalize_known_devices
 from nettracker.discovery.passive import Neighbor, read_neighbors
 from nettracker.discovery.scope import require_allowed_target
 from nettracker.discovery.suggestions import record_merge_suggestions
@@ -26,12 +27,14 @@ def collect_observations(
     clock: Clock = lambda: datetime.now(UTC),
     vendors: Mapping[str, str] | None = None,
     hostname_lookup: HostnameLookup | None = None,
+    known_devices: Collection[str] = (),
 ) -> int:
     """Persist scoped observations; name resolution is opt-in and called after scope checks."""
     if not allowed_subnets:
         raise ValueError("allowed_subnets must not be empty")
     if mode not in ("passive", "active"):
         raise ValueError("unsupported discovery mode")
+    known_macs = normalize_known_devices(known_devices)
     scan_id = repo.start_scan(mode=mode, started_at=clock())
     try:
         neighbors = reader(allowed_subnets)
@@ -40,7 +43,8 @@ def collect_observations(
             seen: set[tuple[str, str]] = set()
             for neighbor in neighbors:
                 require_allowed_target(neighbor.ip, allowed_subnets)
-                key = (neighbor.mac.lower(), neighbor.ip)
+                mac = normalize_mac(neighbor.mac)
+                key = (mac, neighbor.ip)
                 if key in seen:
                     continue
                 seen.add(key)
@@ -51,14 +55,20 @@ def collect_observations(
                 device = repo.upsert_device(
                     neighbor.mac, seen_at=clock(), hostname=hostname, vendor=vendor
                 )
-                if new:
+                approved = (
+                    mac in known_macs and device.status != "ignored" and device.merged_into is None
+                )
+                if approved:
+                    if device.status != "known":
+                        repo.set_status(device.id, "known")
+                elif new:
                     kind: Literal["new_device", "to_confirm"] = (
                         "to_confirm" if device.is_randomized_mac else "new_device"
                     )
                     if device.is_randomized_mac:
                         repo.set_status(device.id, "to_confirm")
                     repo.add_event(kind, created_at=clock(), device_id=device.id)
-                if device.is_randomized_mac and hostname:
+                if not approved and device.is_randomized_mac and hostname:
                     record_merge_suggestions(repo, device.id, created_at=clock())
                 repo.add_sighting(
                     device_id=device.id,
@@ -83,6 +93,7 @@ def collect_passive(
     clock: Clock = lambda: datetime.now(UTC),
     vendors: Mapping[str, str] | None = None,
     hostname_lookup: HostnameLookup | None = None,
+    known_devices: Collection[str] = (),
 ) -> int:
     """Read the system neighbor cache only, without any active discovery backend."""
     return collect_observations(
@@ -93,4 +104,5 @@ def collect_passive(
         clock=clock,
         vendors=vendors,
         hostname_lookup=hostname_lookup,
+        known_devices=known_devices,
     )

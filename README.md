@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : jalon M2 (découverte) en cours.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse optionnelle et les suggestions prudentes pour MAC aléatoires fonctionnent. Le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : jalon M2 (découverte) en cours.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse optionnelle et les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -48,6 +48,12 @@ nettracker check-config
 ```
 
 Valeurs par défaut prudentes : mode passif, alertes en `dry-run`, API sur `127.0.0.1`. Toute écoute hors loopback exige un jeton (`NETTRACKER_API_TOKEN`). Le fichier de config se choisit avec `--config` ou la variable `NETTRACKER_CONFIG`. Priorité pour le jeton, le chemin de base et le niveau de log : variables d'environnement, puis `.env`, puis `config.toml`.
+
+## Appareils connus
+
+Au niveau racine de `config.toml` (avant `[scan]`), `known_devices = []` est vide par défaut. Tu peux y inscrire explicitement des MAC : `known_devices = ["00:11:22:33:44:55"]` (exemple fictif). `nettracker check-config` valide les entrées et affiche leur nombre sans énumérer les MAC. Les majuscules et tirets sont normalisés ; doublons, multicast, broadcast et MAC nulle sont refusés.
+
+Seul un appareil réellement observé dans `allowed_subnets` est alors marqué `known`, sans événement de nouvel inconnu ni de confirmation. La liste ne lance aucun scan, ne précrée aucun appareil et ne remplace pas le contrôle de périmètre. Les statuts ignorés et les fusions manuelles restent prioritaires. Retirer une entrée ne révoque pas le statut `known` déjà enregistré : il faut le reclasser explicitement ; aucune commande utilisateur de révocation n’est encore livrée. Une MAC peut être usurpée : cette liste n’est pas une authentification.
 
 ## Commandes
 

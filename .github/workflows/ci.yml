@@ -13,6 +13,7 @@ jobs:
   quality:
     name: Quality (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -35,7 +36,8 @@ jobs:
       - name: Mypy
         run: mypy
       - name: Pytest
-        run: pytest --cov --cov-report=term-missing
+        timeout-minutes: 5
+        run: pytest -vv --durations=15 --cov --cov-report=term-missing
       - name: Bandit
         run: bandit -r src
       - name: Pip-audit

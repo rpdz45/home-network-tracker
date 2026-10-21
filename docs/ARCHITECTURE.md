@@ -1,6 +1,6 @@
 # Architecture
 
-Document de conception du jalon M0. Aucune logique métier n'est encore écrite ; ce document fixe les composants, les flux, le schéma de données et les choix structurants.
+Conception initiale M0, complétée par les décisions M2 ci-dessous. Les modules de découverte et le schéma versionné sont implémentés ; les composants M3 à M6 restent planifiés.
 
 ## 1. Vue d'ensemble
 
@@ -156,3 +156,9 @@ Le backend `discovery/nmap.py` expose un lecteur injecté pour les tests. La str
 Nmap utilise le XML avec analyse protégée (`defusedxml`), une cible IPv4 RFC1918 littérale autorisée de 256 adresses au maximum, des arguments fixes sans shell et un délai configurable borné. La source `active_nmap` est dégradée par rapport au backend primaire, mais son mode de persistance reste actif. Le schéma SQLite est inchangé ; la source détaillée demeure affichée en console et dans les logs plutôt que stockée dans une nouvelle colonne.
 
 Alternative écartée : activer automatiquement nmap dès que l’ARP échoue. Un opt-in supplémentaire évite d’émettre à l’insu du propriétaire des sondes TCP/ICMP lorsque les paquets bruts ne sont pas autorisés. Les scans de ports, les scripts et les services restent hors périmètre. Suivi : issue #9.
+
+## Décision M2 : appareils connus
+
+Une liste racine `known_devices` contient des MAC normalisées et validées, sans schéma supplémentaire ni dépendance. `discovery/known.py` partage la validation entre configuration et collecteur ; la CLI transmet la liste dans les chemins passif, ARP, nmap et cache dégradé. Le contrôle `allowed_subnets` précède toute application de confiance et résolution de nom. La liste vide conserve les comportements existants.
+
+Décision : promouvoir seulement les appareils observés vers `known`, sans événements d’inconnu ni suggestions pour l’appareil explicitement approuvé. Préserver `ignored` et `merged_into`. Le retrait de la configuration ne rétrograde pas un statut persisté, car SQLite contient aussi les choix manuels et n’enregistre pas l’origine de la confiance. Alternative écartée : rétrograder toutes les MAC absentes de la liste, ce qui écraserait les validations manuelles. Aucun appareil précréé, aucune confiance sur nom/IP, aucune révocation automatique ou nouvelle interface de gestion dans ce lot.

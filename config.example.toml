@@ -4,6 +4,11 @@
 # Only these private ranges (RFC 1918) may be scanned. Prefix /16 or longer.
 allowed_subnets = ["192.168.1.0/24"]
 
+# Optional trusted MACs; applies only to observed devices inside allowed_subnets.
+# Example (invented): known_devices = ["00:11:22:33:44:55"]
+# Removing an entry does not revoke a persisted known status; MACs can be spoofed.
+known_devices = []
+
 database_path = "nettracker.db"
 log_level = "INFO"
 

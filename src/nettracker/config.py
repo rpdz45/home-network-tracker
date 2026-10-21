@@ -21,6 +21,7 @@ from pydantic import (
     model_validator,
 )
 
+from nettracker.discovery.known import normalize_known_devices
 from nettracker.errors import ConfigError
 
 RFC1918_NETWORKS = (
@@ -85,11 +86,17 @@ class Settings(_Model):
     """Validated application settings."""
 
     allowed_subnets: list[IPv4Network] = Field(min_length=1)
+    known_devices: tuple[str, ...] = ()
     database_path: Path = Path("nettracker.db")
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     scan: ScanSettings = Field(default_factory=ScanSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
+
+    @field_validator("known_devices")
+    @classmethod
+    def check_known_devices(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(sorted(normalize_known_devices(value)))
 
     @field_validator("log_level", mode="before")
     @classmethod

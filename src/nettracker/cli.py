@@ -66,6 +66,7 @@ def _check_config(settings: Settings) -> int:
     subnets = ", ".join(str(network) for network in settings.allowed_subnets)
     print("Configuration OK")
     print(f"allowed_subnets: {subnets}")
+    print(f"known_devices: {len(settings.known_devices)} configured MAC address(es)")
     print(f"database_path: {settings.database_path}")
     print(f"scan: mode={settings.scan.mode} interval={settings.scan.interval_seconds}s")
     print(f"alerts: dry_run={str(settings.alerts.dry_run).lower()}")
@@ -132,6 +133,7 @@ def _scan_once(
                 reader=lambda _: result.neighbors,
                 vendors=vendors,
                 hostname_lookup=lookup if resolve_names else None,
+                known_devices=settings.known_devices,
             )
         finally:
             conn.close()
@@ -142,7 +144,15 @@ def _scan_once(
     try:
         migrate(conn)
         repo = Repository(conn)
-        if resolve_names:
+        if settings.known_devices:
+            count = collect_passive(
+                repo,
+                settings.allowed_subnets,
+                vendors=vendors,
+                hostname_lookup=lookup if resolve_names else None,
+                known_devices=settings.known_devices,
+            )
+        elif resolve_names:
             count = collect_passive(
                 repo, settings.allowed_subnets, vendors=vendors, hostname_lookup=lookup
             )
