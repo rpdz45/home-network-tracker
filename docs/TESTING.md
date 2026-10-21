@@ -37,7 +37,7 @@ Ouvre une issue `bug: ...` avec : OS et version, version de Python, commit (`git
 
 Testé hors ligne par la CI : garde-fous de périmètre, cache de voisins simulé, ARP actif simulé avec repli, persistance SQLite, fabricants OUI, résolution de noms injectée et dédoublonnage persistant des suggestions de rapprochement. Ces tests n’émettent aucun paquet réel.
 
-Non testé sur matériel réel : Npcap sous Windows, `CAP_NET_RAW` ou root sous Linux/Raspberry Pi OS, comportement du résolveur DNS du propriétaire, cohérence avec la liste de la box et fonctionnement continu. Les transitions en ligne/hors ligne, les alertes et la reprise automatique appartiennent aux jalons suivants.
+Non testé sur matériel réel : Npcap sous Windows, `CAP_NET_RAW` ou root sous Linux/Raspberry Pi OS, comportement du résolveur DNS du propriétaire, cohérence avec la liste de la box et fonctionnement continu. Le premier lot M3 décrit ci-dessous ajoute des transitions ICMP simulées ; les alertes et la reprise automatique restent à livrer.
 
 
 ## Repli nmap M2
@@ -86,3 +86,14 @@ Ruff, formatage, mypy et Bandit réussis. L'audit initial signalait l'ancien pip
 l'environnement temporaire ; après mise à jour de pip et setuptools comme dans la CI,
 `pip-audit` ne signale plus de vulnérabilité connue (paquet local non auditable sur PyPI).
 Aucun test n'est désactivé et le seuil de couverture reste à 80 %.
+
+## M3 : premier cycle ICMP
+
+`tests/unit/test_ping.py` remplace tous les sous-processus ;
+`tests/integration/test_monitoring.py` utilise une horloge et des sondes simulées
+avec SQLite temporaire. Cas : double consentement, périmètre, Linux/Windows, erreurs,
+latence/perte, transitions et idempotence, DHCP, conflits IP, observation périmée,
+SIGINT, concurrence, verrouillage et migration additive. Aucun paquet ICMP réel.
+Voir [M3_MONITORING.md](M3_MONITORING.md) pour les commandes de test et ce qui reste
+non vérifié sur matériel réel. Le jalon M3 n'est pas terminé : ordonnanceur,
+rétention, suivi prolongé et santé du collecteur restent à implémenter.

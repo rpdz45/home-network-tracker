@@ -43,3 +43,14 @@ Le délai du sous-processus est configurable entre 1 et 120 secondes. La sortie 
 Une MAC explicitement listée ne donne jamais d’autorisation de scan supplémentaire. Le collecteur vérifie d’abord `allowed_subnets`, puis applique la confiance à un appareil observé ; aucune sonde ou précréation n’est déclenchée par la liste. Les entrées doivent être unicast non nulles et uniques après normalisation ; la vérification de configuration n’affiche que leur nombre.
 
 Une MAC peut être usurpée : `known` est un classement local du propriétaire, pas une authentification ni une protection contre un intrus qui copie une MAC. Les MAC privées restent marquées comme telles même lorsqu’elles sont approuvées. Les décisions `ignored` et `merged_into` ne sont pas annulées. Retirer une MAC de la liste ne révoque pas le statut déjà persisté ; le reclassement reste manuel et n’a pas encore d’interface utilisateur. Les événements historiques restent présents, aucune notification n’est introduite.
+
+## Sondes ICMP explicites
+
+Le premier lot M3 exige `monitor.enabled=true` et `--enable-monitoring`, uniquement
+pour des identifiants explicitement sélectionnés, récemment découverts et dans
+`allowed_subnets`. Aucun shell, résolution DNS ou balayage ; processus ping borné,
+sans élévation de droits. `alerts.dry_run` ne bloque pas les sondes autorisées.
+Une réponse ICMP n'authentifie pas la MAC et une absence de réponse ne prouve pas
+une déconnexion. Les erreurs locales sont séparées des non-réponses. Les limites
+Windows/locales, pare-feu et DHCP sont détaillées dans [M3_MONITORING.md](M3_MONITORING.md).
+Sauvegarder la base avant la migration V2 ; l'ancien programme refusera ce schéma.

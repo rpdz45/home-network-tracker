@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : jalon M2 (découverte) en cours.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse optionnelle et les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le suivi (M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : découverte M2 et premier lot de suivi M3 disponibles.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse / mDNS optionnelle, les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le cycle ICMP explicite `monitor-once` est disponible. Le suivi périodique et la rétention (reste de M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -62,7 +62,8 @@ nettracker --help
 nettracker --version
 nettracker check-config [--config CHEMIN]
 nettracker init-db [--config CHEMIN]
-nettracker scan-once [--config CHEMIN] [--resolve-names] [--oui-file CHEMIN]
+nettracker scan-once [--config CHEMIN] [--resolve-names] [--resolve-mdns] [--oui-file CHEMIN]
+nettracker monitor-once [--config CHEMIN] --device-id ID [--device-id ID] --enable-monitoring
 ```
 
 `init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque. `scan-once` lit le cache de voisins par défaut. La résolution DNS inverse reste désactivée sans `--resolve-names` et peut émettre des requêtes via le résolveur système. Le mode ARP actif exige en plus `scan.mode = "active"`, `--enable-active` et une cible `--target` explicitement autorisée. Le repli nmap reste désactivé sans `scan.nmap_fallback = true` ; il ne sert qu’après un échec de l’ARP brut et conserve les mêmes garde-fous de cible. Voir [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md).
@@ -86,6 +87,7 @@ La CI GitHub exécute les mêmes contrôles sur Linux et Windows.
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/TESTING.md](docs/TESTING.md)
 - [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md)
+- [docs/M3_MONITORING.md](docs/M3_MONITORING.md)
 - [AGENTS.md](AGENTS.md) : règles de travail pour les agents IA
 
 ## Licence
@@ -138,3 +140,14 @@ l'écoute continue et la découverte de services ne sont pas implémentées. Le 
 total peut atteindre le nombre d'IPv4 observées multiplié par le délai configuré.
 La commande ci-dessus est à lancer uniquement sur votre réseau ; aucune validation
 sur matériel réel n'a été réalisée pour ce lot.
+
+## Premier suivi ICMP (M3)
+
+`monitor-once` mesure la joignabilité ICMP des seuls appareils sélectionnés, avec
+`monitor.enabled=true` **et** `--enable-monitoring`. Le suivi est désactivé par défaut ;
+les IPv4 doivent être privées, autorisées et récemment découvertes. Les mesures de
+latence/perte et les transitions sont locales dans SQLite (migration V2 additive).
+Une non-réponse n'est pas une preuve de déconnexion : un pare-feu peut bloquer ICMP.
+Voir [docs/M3_MONITORING.md](docs/M3_MONITORING.md) pour configuration, commandes,
+droits système, tests simulés et limites. Pas encore de planification ni de rétention ;
+aucune validation sur réseau ou matériel réel n'a été effectuée pour ce lot.
