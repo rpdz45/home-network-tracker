@@ -9,6 +9,7 @@ from pathlib import Path
 from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
+from nettracker.db.monitoring import MonitoringRepository
 from nettracker.discovery.collector import ScanMode, collect_observations, collect_passive
 from nettracker.discovery.mdns import mdns_hostname
 from nettracker.discovery.names import reverse_hostname
@@ -16,12 +17,14 @@ from nettracker.discovery.passive import read_neighbors
 from nettracker.discovery.strategy import discover_with_fallback
 from nettracker.discovery.vendor import parse_ma_l_csv
 from nettracker.errors import ConfigError, NetTrackerError
+from nettracker.monitor.service import monitor_once
 
 logger = logging.getLogger("nettracker")
 
 COMMANDS = {
     "check-config": "Validate the configuration and print a summary (secrets are never shown).",
     "init-db": "Create or upgrade the SQLite database schema.",
+    "monitor-once": "Measure ICMP reachability for explicitly selected discovered devices.",
     "scan-once": "Discover scoped neighbors once and save observations.",
 }
 
@@ -42,6 +45,19 @@ def build_parser() -> argparse.ArgumentParser:
             default=None,
             help="path to the TOML config (default: $NETTRACKER_CONFIG or ./config.toml)",
         )
+        if name == "monitor-once":
+            sub.add_argument(
+                "--device-id",
+                action="append",
+                type=int,
+                required=True,
+                help="explicit discovered device ID (repeatable, max 64)",
+            )
+            sub.add_argument(
+                "--enable-monitoring",
+                action="store_true",
+                help="authorize ICMP packets; requires monitor.enabled=true",
+            )
         if name == "scan-once":
             sub.add_argument(
                 "--resolve-names",
@@ -225,6 +241,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _check_config(settings)
         if args.command == "init-db":
             return _init_db(settings)
+        if args.command == "monitor-once":
+            if not args.enable_monitoring or not settings.monitor.enabled:
+                raise ConfigError(
+                    "monitoring requires monitor.enabled=true and --enable-monitoring"
+                )
+            conn = connect(settings.database_path)
+            try:
+                migrate(conn)
+                count = monitor_once(
+                    MonitoringRepository(conn), settings, args.device_id, enabled=True
+                )
+            finally:
+                conn.close()
+            print(f"Monitoring complete: {count} measurement(s); ICMP reachability is not identity")
+            return 0
         return _scan_once(
             settings,
             args.oui_file,
@@ -233,6 +264,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.resolve_names,
             args.resolve_mdns,
         )
+    except KeyboardInterrupt:
+        print("interrupted", file=sys.stderr)
+        return 130
     except NetTrackerError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
