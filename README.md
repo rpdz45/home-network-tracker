@@ -91,3 +91,50 @@ La CI GitHub exécute les mêmes contrôles sur Linux et Windows.
 ## Licence
 
 MIT, voir [LICENSE](LICENSE).
+
+
+## Noms mDNS ciblés (M2)
+
+Voir [architecture, sécurité et tests mDNS](docs/MDNS.md).
+
+Par défaut, aucune requête mDNS n'est émise. Deux accords sont nécessaires :
+`mdns_enabled = true` dans la table `[scan]` de votre configuration et le drapeau
+`--resolve-mdns` lors de l'exécution. Le délai par appareil se règle avec
+`mdns_timeout_seconds` (1 seconde par défaut, entre 0,1 et 5 secondes).
+
+```toml
+[scan]
+mode = "passive"
+mdns_enabled = true
+mdns_timeout_seconds = 1.0
+```
+
+```bash
+nettracker scan-once --config config.toml --resolve-mdns
+```
+
+**Cette commande n'est plus entièrement passive** : elle lit le cache de voisins,
+puis adresse une seule requête PTR UDP au port 5353 de chaque IPv4 observée et
+autorisée par `allowed_subnets`. Le cycle est enregistré comme `active` dans SQLite,
+y compris après un repli ARP/nmap vers le cache système. Aucun balayage supplémentaire,
+parcours DNS-SD de services, envoi multicast, repli TCP ou recours au DNS système
+n'est effectué par le backend mDNS. Aucun droit root/admin n'est demandé pour ce
+socket UDP ; le pare-feu peut néanmoins le bloquer.
+
+Seuls les noms `.local` valides des réponses PTR correspondant à l'IPv4 interrogée
+sont retenus. Une absence de réponse, un refus de permission, une réponse ambiguë
+ou malformée laisse le nom inconnu, sans perdre l'observation de l'appareil.
+Le nom est un indice non authentifié : il n'accorde aucune confiance ni fusion
+automatique aux appareils, notamment ceux à MAC aléatoire.
+
+Si les deux drapeaux `--resolve-mdns --resolve-names` sont présents, mDNS est essayé
+en premier, puis le DNS inverse système seulement en l'absence de nom mDNS. Le DNS
+système peut contacter un résolveur hors du LAN ; ne pas ajouter `--resolve-names`
+si vous souhaitez éviter cet accès.
+
+**Limites et test terrain** : le choix des requêtes directes unicast peut manquer
+les appareils n'acceptant que le multicast ou ne publiant pas de PTR inverse. IPv6,
+l'écoute continue et la découverte de services ne sont pas implémentées. Le délai
+total peut atteindre le nombre d'IPv4 observées multiplié par le délai configuré.
+La commande ci-dessus est à lancer uniquement sur votre réseau ; aucune validation
+sur matériel réel n'a été réalisée pour ce lot.
