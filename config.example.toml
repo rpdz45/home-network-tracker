@@ -25,6 +25,15 @@ nmap_fallback = false
 # Total subprocess timeout, between 1 and 120 seconds.
 nmap_timeout_seconds = 30
 
+[monitor]
+# Active ICMP requires this AND --enable-monitoring; no periodic runner yet.
+enabled = false
+packets = 3
+# Per attempt; process hard deadline adds 0.5 seconds for cleanup.
+timeout_seconds = 1.0
+# Refuse stale discovery records (60 to 86400 seconds).
+max_observation_age_seconds = 1800
+
 [alerts]
 # While true, no notification is ever sent.
 dry_run = true
