@@ -51,3 +51,38 @@ Non testé sur matériel réel : Npcap sous Windows, `CAP_NET_RAW` ou root sous 
 `tests/unit/test_known_devices.py` vérifie le défaut vide, la normalisation, les doublons, les adresses invalides/nulles/multicast, les erreurs avant ouverture SQLite et le résumé sans MAC. `tests/integration/test_known_observations.py` vérifie les nouveaux appareils et les promotions, les statuts ignorés/fusionnés, le retrait sans révocation, la réouverture SQLite, le périmètre avec rollback, l’absence de précréation et l’absence de suggestions pour les appareils approuvés.
 
 Le raccordement CLI est testé avec résultats ARP, nmap et cache simulés, DNS injecté et CSV OUI fictif. Aucun test ne lit le réseau du propriétaire ni ne lance de sonde réelle ; les backends ne sont pas validés sur matériel. Pour vérifier seulement la configuration locale sans scan : `nettracker check-config --config config.toml`. La sortie attendue contient le nombre de MAC configurées, jamais leur liste.
+
+## Identifiants pytest et Windows
+
+Les paramètres volumineux doivent avoir des identifiants courts et explicites (`ids=`).
+Sans identifiant explicite, pytest peut intégrer toute une chaîne XML dans le nom du test,
+puis dans la variable d'environnement `PYTEST_CURRENT_TEST`. Le cas de dépassement de
+la limite XML conservait ainsi plus d'un million de caractères dans cet identifiant.
+Cela dépasse la limite Windows d'une variable d'environnement et gonfle les journaux.
+Ce défaut est une cause probable de l'échec Windows de la PR #11 ; les journaux détaillés
+du job initial n'ont pas pu être récupérés et les 144 minutes ne sont pas reproduites localement.
+Les six cas de XML invalide gardent leurs charges utiles et leurs assertions de rejet ;
+ils vérifient aussi que leur identifiant reste inférieur à 200 caractères.
+
+La CI lance pytest en mode détaillé avec les 15 durées les plus longues. L'étape pytest
+est limitée à 5 minutes et le job qualité à 15 minutes : un blocage échoue rapidement,
+sans désactiver de test ni réduire le seuil de couverture.
+
+Reproduction hors ligne :
+
+```bash
+pytest tests/unit/test_nmap.py -k invalid_or_unsafe_xml -vv
+pytest -vv --durations=15 --cov --cov-report=term-missing
+```
+
+La validation locale Linux ne remplace pas le contrôle `windows-latest` de la PR.
+Aucun scan, appel DNS réel ou test sur le LAN n'est nécessaire pour ce correctif.
+
+Références : [pytest et `PYTEST_CURRENT_TEST`](https://doc.pytest.org/en/6.2.x/example/simple.html#pytest-current-test-environment-variable),
+[limite Windows des variables d'environnement](https://support.microsoft.com/en-gb/help/830473/command-prom).
+
+Validation du correctif sous Linux : 207 tests réussis, couverture totale 95,23 % ;
+Ruff, formatage, mypy et Bandit réussis. L'audit initial signalait l'ancien pip de
+l'environnement temporaire ; après mise à jour de pip et setuptools comme dans la CI,
+`pip-audit` ne signale plus de vulnérabilité connue (paquet local non auditable sur PyPI).
+Aucun test n'est désactivé et le seuil de couverture reste à 80 %.

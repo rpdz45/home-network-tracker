@@ -111,8 +111,11 @@ def test_responses_must_be_within_requested_target(target: str) -> None:
         '<!DOCTYPE nmaprun [<!ENTITY x "secret">]><nmaprun>&x;</nmaprun>',
         '<!DOCTYPE nmaprun [<!ENTITY x SYSTEM "file:///nonexistent">]><nmaprun>&x;</nmaprun>',
     ],
+    ids=["malformed", "wrong-root", "failed-run", "oversized", "entity", "external-entity"],
 )
-def test_invalid_or_unsafe_xml(document: str) -> None:
+def test_invalid_or_unsafe_xml(document: str, request: pytest.FixtureRequest) -> None:
+    # Pytest copies node IDs to PYTEST_CURRENT_TEST; never embed the XML payload.
+    assert len(request.node.nodeid) < 200
     with pytest.raises(NmapDiscoveryError):
         parse_nmap_xml(document, TARGET, ALLOWED)
 
