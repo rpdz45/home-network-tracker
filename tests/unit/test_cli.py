@@ -6,6 +6,7 @@ import pytest
 
 from nettracker import __version__
 from nettracker.cli import main
+from nettracker.db import LATEST_VERSION
 
 CONFIG = 'allowed_subnets = ["192.168.1.0/24"]\ndatabase_path = "cli-test.db"\n'
 
@@ -97,7 +98,7 @@ def test_init_db_creates_the_database_and_is_repeatable(
     assert main(["init-db"]) == 0
     assert (isolated_cwd / "cli-test.db").exists()
     assert main(["init-db"]) == 0
-    assert "schema version 1" in capsys.readouterr().out
+    assert f"schema version {LATEST_VERSION}" in capsys.readouterr().out
 
 
 def test_init_db_reports_database_errors(

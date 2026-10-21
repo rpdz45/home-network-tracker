@@ -74,7 +74,21 @@ _V1: tuple[str, ...] = (
     """,
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1,)
+_V2: tuple[str, ...] = (
+    "ALTER TABLE sightings ADD COLUMN source TEXT NOT NULL DEFAULT 'discovery' "
+    "CHECK (source IN ('discovery', 'ping'))",
+    "CREATE UNIQUE INDEX idx_ping_sample ON sightings (device_id, seen_at) WHERE source = 'ping'",
+    """
+    CREATE TABLE monitor_state (
+        device_id INTEGER PRIMARY KEY REFERENCES devices(id),
+        ip TEXT NOT NULL,
+        online INTEGER NOT NULL CHECK (online IN (0, 1)),
+        checked_at TEXT NOT NULL
+    )
+    """,
+)
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2)
 LATEST_VERSION = len(MIGRATIONS)
 
 

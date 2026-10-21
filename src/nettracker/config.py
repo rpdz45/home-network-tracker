@@ -54,6 +54,15 @@ class ScanSettings(_Model):
     nmap_timeout_seconds: float = Field(default=30.0, ge=1, le=120, allow_inf_nan=False)
 
 
+class MonitorSettings(_Model):
+    """Monitoring is off until config and CLI both authorize probes."""
+
+    enabled: bool = False
+    packets: int = Field(default=3, ge=1, le=5)
+    timeout_seconds: float = Field(default=1.0, ge=0.1, le=5.0, allow_inf_nan=False)
+    max_observation_age_seconds: int = Field(default=1800, ge=60, le=86_400)
+
+
 class AlertSettings(_Model):
     """Alert settings. Dry-run is the default: nothing is sent until it is turned off."""
 
@@ -92,6 +101,7 @@ class Settings(_Model):
     database_path: Path = Path("nettracker.db")
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     scan: ScanSettings = Field(default_factory=ScanSettings)
+    monitor: MonitorSettings = Field(default_factory=MonitorSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
 
