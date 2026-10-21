@@ -216,23 +216,38 @@ Lis AGENTS.md en entier et applique-le strictement.
 Rôle : Architecte. Jalon : M0.
 1) Résume-moi en 10 lignes ce que tu as compris et liste les paramètres
    manquants de la section 0.
-2) Propose docs/ARCHITECTURE.md (composants, schéma SQLite, arborescence)
-   sans écrire de logique métier.
+2) Propose docs/ARCHITECTURE.md (composants, flux de données, schéma SQLite,
+   arborescence) sans écrire de logique métier.
 3) Prépare une PR depuis la branche feat/m0-foundations (structure,
    pyproject.toml, .gitignore, .env.example, CI).
 Ne pousse jamais sur main. Ne lance aucun scan réseau.
 ```
 
-### 11.2 Prompt pour Perplexity (recherche et PR limitées)
+### 11.2 Autorisation et prompt pour Perplexity
+
+Autorisation explicite du propriétaire le 21 octobre 2026 : Perplexity peut écrire et modifier le code applicatif, les tests et la documentation pour les missions confiées par le propriétaire, dans le périmètre des jalons du projet. Cette autorisation remplace la restriction précédente aux seules recherches et PR limitées ; elle ne déroge à aucune règle de sécurité, de qualité ou de workflow des sections 2, 5, 6, 7 et 9.
 
 ```text
-Contexte : dépôt privé home-network-tracker (voir AGENTS.md).
-Tu n'écris PAS de code applicatif. Chaque mission se fait sur une branche
-ext/perplexity-<sujet> avec une PR :
+Contexte : dépôt home-network-tracker (voir AGENTS.md).
+Lis AGENTS.md en entier. Pour la mission confiée par le propriétaire,
+tu peux contribuer à l'architecture, au code applicatif, aux tests,
+à la sécurité et à la documentation, en annonçant le rôle en cours.
+Chaque mission se fait sur une branche ext/perplexity-<sujet> avec une PR
+limitée et relisible, selon les jalons et critères d'acceptation du projet.
+Tu peux notamment :
+- implémenter ou corriger les fonctionnalités du jalon demandé, avec
+  typage, interfaces réseau remplaçables, tests et documentation ;
 - vérifier les versions et les vulnérabilités connues des dépendances de
   pyproject.toml (sources citées) ;
 - mettre à jour data/oui/ depuis la source officielle de l'IEEE ;
-- relire docs/SECURITY.md et signaler les manques (avec sources).
-Règles : jamais de push sur main, aucun secret, toute affirmation sourcée.
+- relire docs/SECURITY.md et corriger ou signaler les manques.
+Règles inchangées : jamais de push direct sur main ni de force-push sur
+une branche partagée ; aucun secret ; aucun paquet réseau réel dans les
+tests ; garde-fous allowed_subnets et activation explicite des sondes
+préservés ; fusion en squash uniquement après CI verte.
+Sépare les résultats réellement vérifiés (tests locaux, CI) de ce qui
+n'a pas été testé sur matériel réel. Source les affirmations de recherche.
+Cette autorisation n'accorde aucun accès supplémentaire aux systèmes et
+ne permet pas de contourner les permissions techniques manquantes.
 Si une permission te manque, dis-le au lieu de la contourner.
 ```
