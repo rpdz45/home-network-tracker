@@ -10,7 +10,9 @@ from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
 from nettracker.discovery.collector import ScanMode, collect_observations, collect_passive
+from nettracker.discovery.mdns import mdns_hostname
 from nettracker.discovery.names import reverse_hostname
+from nettracker.discovery.passive import read_neighbors
 from nettracker.discovery.strategy import discover_with_fallback
 from nettracker.discovery.vendor import parse_ma_l_csv
 from nettracker.errors import ConfigError, NetTrackerError
@@ -45,6 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
                 "--resolve-names",
                 action="store_true",
                 help="opt in to reverse DNS via the system resolver (may send DNS queries)",
+            )
+            sub.add_argument(
+                "--resolve-mdns",
+                action="store_true",
+                help="opt in to targeted mDNS PTR queries on UDP 5353 (sends packets)",
             )
             sub.add_argument(
                 "--oui-file",
@@ -91,7 +98,10 @@ def _scan_once(
     target: str | None = None,
     enable_active: bool = False,
     resolve_names: bool = False,
+    resolve_mdns: bool = False,
 ) -> int:
+    if resolve_mdns and not settings.scan.mdns_enabled:
+        raise ConfigError("mDNS requires scan.mdns_enabled=true and --resolve-mdns")
     active = settings.scan.mode == "active"
     if active and (not enable_active or target is None):
         raise ConfigError("passive mode only; active requires --enable-active and --target")
@@ -104,9 +114,29 @@ def _scan_once(
         except (OSError, UnicodeDecodeError, ValueError) as exc:
             raise ConfigError(f"cannot load IEEE vendor file {oui_file}: {exc}") from exc
 
-    def lookup(ip: str) -> str | None:
-        return reverse_hostname(ip, settings.allowed_subnets, enabled=True)
+    resolved: dict[str, str | None] = {}
 
+    def lookup(ip: str) -> str | None:
+        if ip in resolved:
+            return resolved[ip]
+        if resolve_mdns:
+            name = mdns_hostname(
+                ip,
+                settings.allowed_subnets,
+                enabled=True,
+                timeout=settings.scan.mdns_timeout_seconds,
+            )
+            if name is not None:
+                resolved[ip] = name
+                return name
+        name = (
+            reverse_hostname(ip, settings.allowed_subnets, enabled=True) if resolve_names else None
+        )
+        resolved[ip] = name
+        return name
+
+    if resolve_mdns:
+        logger.warning("mDNS enabled: targeted active UDP 5353 queries; no multicast browsing")
     if resolve_names:
         logger.warning("reverse DNS enabled: system resolver may send queries outside the LAN")
     if active:
@@ -117,7 +147,9 @@ def _scan_once(
             nmap_enabled=settings.scan.nmap_fallback,
             nmap_timeout=settings.scan.nmap_timeout_seconds,
         )
-        mode: ScanMode = "passive" if result.source == "system_neighbor_cache" else "active"
+        mode: ScanMode = (
+            "passive" if result.source == "system_neighbor_cache" and not resolve_mdns else "active"
+        )
         if result.degraded:
             if result.source == "active_nmap":
                 print("Degraded mode: nmap host discovery fallback (active)")
@@ -132,24 +164,34 @@ def _scan_once(
                 mode=mode,
                 reader=lambda _: result.neighbors,
                 vendors=vendors,
-                hostname_lookup=lookup if resolve_names else None,
+                hostname_lookup=lookup if resolve_names or resolve_mdns else None,
                 known_devices=settings.known_devices,
             )
         finally:
             conn.close()
         print(f"Discovery complete: {count} observation(s) from {result.source}")
         return 0
-    logger.warning("passive discovery: system neighbor cache only; no ARP probes")
+    logger.warning("discovery from system neighbor cache; no ARP probes")
     conn = connect(settings.database_path)
     try:
         migrate(conn)
         repo = Repository(conn)
-        if settings.known_devices:
+        if resolve_mdns:
+            count = collect_observations(
+                repo,
+                settings.allowed_subnets,
+                mode="active",
+                reader=read_neighbors,
+                vendors=vendors,
+                hostname_lookup=lookup,
+                known_devices=settings.known_devices,
+            )
+        elif settings.known_devices:
             count = collect_passive(
                 repo,
                 settings.allowed_subnets,
                 vendors=vendors,
-                hostname_lookup=lookup if resolve_names else None,
+                hostname_lookup=lookup if resolve_names or resolve_mdns else None,
                 known_devices=settings.known_devices,
             )
         elif resolve_names:
@@ -162,7 +204,8 @@ def _scan_once(
             count = collect_passive(repo, settings.allowed_subnets, vendors=vendors)
     finally:
         conn.close()
-    print(f"Passive discovery complete: {count} observation(s) from the system neighbor cache")
+    label = "Discovery with active mDNS" if resolve_mdns else "Passive discovery"
+    print(f"{label} complete: {count} observation(s) from the system neighbor cache")
     return 0
 
 
@@ -183,7 +226,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "init-db":
             return _init_db(settings)
         return _scan_once(
-            settings, args.oui_file, args.target, args.enable_active, args.resolve_names
+            settings,
+            args.oui_file,
+            args.target,
+            args.enable_active,
+            args.resolve_names,
+            args.resolve_mdns,
         )
     except NetTrackerError as exc:
         print(f"error: {exc}", file=sys.stderr)
