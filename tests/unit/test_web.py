@@ -49,9 +49,7 @@ def seed(path: Path) -> None:
         conn.close()
 
 
-def make_client(
-    tmp_path: Path, credential: str | None = None, now: datetime = NOW
-) -> TestClient:
+def make_client(tmp_path: Path, credential: str | None = None, now: datetime = NOW) -> TestClient:
     settings = make_settings(tmp_path, credential)
     seed(settings.database_path)
     return TestClient(create_app(settings, clock=lambda: now))
