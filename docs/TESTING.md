@@ -96,4 +96,16 @@ latence/perte, transitions et idempotence, DHCP, conflits IP, observation périm
 SIGINT, concurrence, verrouillage et migration additive. Aucun paquet ICMP réel.
 Voir [M3_MONITORING.md](M3_MONITORING.md) pour les commandes de test et ce qui reste
 non vérifié sur matériel réel. Le jalon M3 n'est pas terminé : ordonnanceur,
-rétention, suivi prolongé et santé du collecteur restent à implémenter.
+suivi prolongé et santé du collecteur restent à implémenter.
+
+## M3 : rétention de l'historique
+
+`tests/test_retention.py` teste la couche données sur SQLite en mémoire : l'aperçu ne modifie rien, seuls les échantillons `ping` anciens sont supprimés (les lignes `discovery` et les appareils restent), la suppression respecte `batch_size` et `max_batches`, et les limites invalides sont refusées. `tests/unit/test_cli_prune.py` couvre la commande `prune-history` : aperçu par défaut, double opt-in (`retention.enabled` et `--apply`) et périmètre de la suppression.
+
+Reproduction hors ligne :
+
+```bash
+pytest tests/test_retention.py tests/unit/test_cli_prune.py -vv
+```
+
+Aucun accès réseau n'est nécessaire. Non couvert : performance sur une base volumineuse (le filtre `source = 'ping' AND seen_at < ?` n'a pas d'index dédié, à évaluer avant une migration V3 éventuelle), exécution répétée sur une base réelle et planification périodique (hors périmètre de ce lot).
