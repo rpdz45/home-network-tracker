@@ -63,6 +63,15 @@ class MonitorSettings(_Model):
     max_observation_age_seconds: int = Field(default=1800, ge=60, le=86_400)
 
 
+class RetentionSettings(_Model):
+    """Pruning of old ping samples. Deletion stays off until config and CLI both authorize it."""
+
+    enabled: bool = False
+    keep_days: int = Field(default=30, ge=1, le=3650)
+    batch_size: int = Field(default=500, ge=1, le=5000)
+    max_batches: int = Field(default=100, ge=1, le=1000)
+
+
 class AlertSettings(_Model):
     """Alert settings. Dry-run is the default: nothing is sent until it is turned off."""
 
@@ -102,6 +111,7 @@ class Settings(_Model):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     scan: ScanSettings = Field(default_factory=ScanSettings)
     monitor: MonitorSettings = Field(default_factory=MonitorSettings)
+    retention: RetentionSettings = Field(default_factory=RetentionSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
 
