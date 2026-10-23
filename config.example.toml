@@ -44,6 +44,11 @@ keep_days = 30
 batch_size = 500
 max_batches = 100
 
+[health]
+# `nettracker health-check` reports the collector as stale after this many minutes without
+# a successful scan (1 to 10080). Keep it well above your real scan interval (2-3x or more).
+stale_after_minutes = 15
+
 [alerts]
 # While true, no notification is ever sent.
 dry_run = true

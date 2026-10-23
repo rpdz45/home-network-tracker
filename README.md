@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : découverte M2, premier lot de suivi M3 et rétention disponibles.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse / mDNS optionnelle, les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le cycle ICMP explicite `monitor-once` et la commande `prune-history` (aperçu par défaut, suppression en double opt-in) sont disponibles. Le suivi périodique (reste de M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : découverte M2, premier lot de suivi M3, rétention et santé du collecteur disponibles.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse / mDNS optionnelle, les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le cycle ICMP explicite `monitor-once`, la commande `prune-history` (aperçu par défaut, suppression en double opt-in) et la commande `health-check` sont disponibles. Le suivi périodique (reste de M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -65,6 +65,7 @@ nettracker init-db [--config CHEMIN]
 nettracker scan-once [--config CHEMIN] [--resolve-names] [--resolve-mdns] [--oui-file CHEMIN]
 nettracker monitor-once [--config CHEMIN] --device-id ID [--device-id ID] --enable-monitoring
 nettracker prune-history [--config CHEMIN] [--apply]
+nettracker health-check [--config CHEMIN]
 ```
 
 `init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque. `scan-once` lit le cache de voisins par défaut. La résolution DNS inverse reste désactivée sans `--resolve-names` et peut émettre des requêtes via le résolveur système. Le mode ARP actif exige en plus `scan.mode = "active"`, `--enable-active` et une cible `--target` explicitement autorisée. Le repli nmap reste désactivé sans `scan.nmap_fallback = true` ; il ne sert qu’après un échec de l’ARP brut et conserve les mêmes garde-fous de cible. Voir [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md).
@@ -89,6 +90,7 @@ La CI GitHub exécute les mêmes contrôles sur Linux et Windows.
 - [docs/TESTING.md](docs/TESTING.md)
 - [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md)
 - [docs/M3_MONITORING.md](docs/M3_MONITORING.md)
+- [docs/M3_HEALTH.md](docs/M3_HEALTH.md)
 - [AGENTS.md](AGENTS.md) : règles de travail pour les agents IA
 
 ## Licence
@@ -174,3 +176,13 @@ nettracker prune-history --config config.toml --apply
 ```
 
 Sans `retention.enabled = true`, `--apply` est refusé avec un message d'erreur. Une exécution supprime au plus `batch_size × max_batches` lignes ; relance la commande si l'aperçu en annonce davantage. Pas de planification automatique (cron / service : lot ultérieur). Sauvegarde ta base avant la première suppression réelle. Aucune validation sur matériel réel n'a été effectuée pour ce lot ; seuls les tests unitaires le couvrent.
+
+## Santé du collecteur (M3)
+
+`health-check` indique si la découverte tourne encore : date du dernier `scan-once` réussi, ancienneté, derniers échecs. Au-delà de `health.stale_after_minutes` (15 par défaut) sans scan réussi, il enregistre un événement `collector_stale` **une seule fois par panne** et rend le code de sortie 3.
+
+```bash
+nettracker health-check --config config.toml
+```
+
+La commande n'envoie aucune notification (alertes : M4) et ne tourne pas toute seule : planifie-la toi-même. Voir [docs/M3_HEALTH.md](docs/M3_HEALTH.md) pour le fonctionnement, les limites et les tests. Aucune validation sur matériel réel n'a été effectuée pour ce lot.

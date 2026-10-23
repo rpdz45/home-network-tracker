@@ -5,6 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ver
 ## [Non publié]
 
 ### Ajouté
+- M3 : commande `health-check` : dernier scan réussi, ancienneté, problèmes récents ; code de sortie 3 si le collecteur est périmé. Enregistre un événement `collector_stale` une seule fois par panne (réarmé par un scan réussi), sans notification ni migration. Section `[health]` (`stale_after_minutes`, défaut 15).
 - M3 : commande `prune-history` : aperçu en lecture seule par défaut ; suppression réelle seulement avec `retention.enabled=true` **et** `--apply`. Seuls les échantillons ping sont supprimés (lots bornés, une transaction par lot) ; appareils, observations de découverte, états, événements et notifications ne sont jamais touchés.
 - M3 : section de configuration `[retention]` validée (`enabled`, `keep_days`, `batch_size`, `max_batches`), désactivée par défaut ; résumé affiché par `check-config`.
 - M3 : cycle ICMP explicite `monitor-once` (double opt-in `monitor.enabled` + `--enable-monitoring`) et migration SQLite V2 additive (`sightings.source`, `monitor_state`).
