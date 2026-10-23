@@ -72,6 +72,12 @@ class RetentionSettings(_Model):
     max_batches: int = Field(default=100, ge=1, le=1000)
 
 
+class HealthSettings(_Model):
+    """Collector health: minutes without a successful scan before it is reported as stale."""
+
+    stale_after_minutes: int = Field(default=15, ge=1, le=10_080)
+
+
 class AlertSettings(_Model):
     """Alert settings. Dry-run is the default: nothing is sent until it is turned off."""
 
@@ -112,6 +118,7 @@ class Settings(_Model):
     scan: ScanSettings = Field(default_factory=ScanSettings)
     monitor: MonitorSettings = Field(default_factory=MonitorSettings)
     retention: RetentionSettings = Field(default_factory=RetentionSettings)
+    health: HealthSettings = Field(default_factory=HealthSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
 

@@ -10,6 +10,7 @@ from pathlib import Path
 from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
+from nettracker.db.health import collector_health, record_stale_event
 from nettracker.db.monitoring import MonitoringRepository
 from nettracker.db.retention import count_prunable, cutoff_for, prune_ping_samples
 from nettracker.discovery.collector import ScanMode, collect_observations, collect_passive
@@ -23,8 +24,11 @@ from nettracker.monitor.service import monitor_once
 
 logger = logging.getLogger("nettracker")
 
+STALE_EXIT_CODE = 3
+
 COMMANDS = {
     "check-config": "Validate the configuration and print a summary (secrets are never shown).",
+    "health-check": "Report collector health; record a collector_stale event once per outage.",
     "init-db": "Create or upgrade the SQLite database schema.",
     "monitor-once": "Measure ICMP reachability for explicitly selected discovered devices.",
     "prune-history": "Preview or delete old ping samples (preview only unless authorized).",
@@ -105,6 +109,7 @@ def _check_config(settings: Settings) -> int:
         f"retention: enabled={str(settings.retention.enabled).lower()} "
         f"keep_days={settings.retention.keep_days}"
     )
+    print(f"health: stale_after_minutes={settings.health.stale_after_minutes}")
     print(f"alerts: dry_run={str(settings.alerts.dry_run).lower()}")
     print(f"api: {settings.api.host}:{settings.api.port} (token: {token_state})")
     return 0
@@ -119,6 +124,34 @@ def _init_db(settings: Settings) -> int:
     logger.info("database ready at %s", settings.database_path)
     print(f"Database ready: {settings.database_path} (schema version {version})")
     return 0
+
+
+def _health_check(settings: Settings) -> int:
+    now = datetime.now(UTC)
+    minutes = settings.health.stale_after_minutes
+    threshold = minutes * 60
+    conn = connect(settings.database_path)
+    try:
+        migrate(conn)
+        health = collector_health(conn, now, threshold)
+        created = record_stale_event(conn, now, threshold) if health.stale else False
+    finally:
+        conn.close()
+    if health.last_success_at is None:
+        print("Collector: no successful scan recorded yet")
+    else:
+        state = "STALE" if health.stale else "OK"
+        age = int(health.age_seconds or 0)
+        print(
+            f"Collector: {state} (last successful scan {health.last_success_at}, "
+            f"{age}s ago, threshold {minutes} min)"
+        )
+    for problem in health.recent_problems:
+        detail = problem.error or "unfinished"
+        print(f"Recent problem: scan started {problem.started_at} status={problem.status} {detail}")
+    if created:
+        print("Event collector_stale recorded; no notification is sent by this command")
+    return STALE_EXIT_CODE if health.stale else 0
 
 
 def _prune_history(settings: Settings, apply: bool) -> int:
@@ -280,6 +313,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _check_config(settings)
         if args.command == "init-db":
             return _init_db(settings)
+        if args.command == "health-check":
+            return _health_check(settings)
         if args.command == "prune-history":
             return _prune_history(settings, args.apply)
         if args.command == "monitor-once":
