@@ -11,6 +11,7 @@ from nettracker.db import Repository, connect, migrate
 
 BASE = 'allowed_subnets = ["192.168.1.0/24"]\ndatabase_path = "prune-test.db"\n'
 ENABLED = BASE + "\n[retention]\nenabled = true\nkeep_days = 30\n"
+IP = "192.168.1.10"
 
 
 @pytest.fixture(autouse=True)
@@ -34,10 +35,12 @@ def seed(directory: Path) -> None:
         migrate(conn)
         repo = Repository(conn)
         device = repo.upsert_device("aa:bb:cc:dd:ee:01", seen_at=now)
-        old_ping = repo.add_sighting(device_id=device.id, ip="192.168.1.10", online=True, seen_at=old)
-        new_ping = repo.add_sighting(device_id=device.id, ip="192.168.1.10", online=True, seen_at=now)
-        repo.add_sighting(device_id=device.id, ip="192.168.1.10", online=True, seen_at=old)
-        conn.execute("UPDATE sightings SET source = 'ping' WHERE id IN (?, ?)", (old_ping, new_ping))
+        old_ping = repo.add_sighting(device_id=device.id, ip=IP, online=True, seen_at=old)
+        new_ping = repo.add_sighting(device_id=device.id, ip=IP, online=True, seen_at=now)
+        repo.add_sighting(device_id=device.id, ip=IP, online=True, seen_at=old)
+        conn.execute(
+            "UPDATE sightings SET source = 'ping' WHERE id IN (?, ?)", (old_ping, new_ping)
+        )
     finally:
         conn.close()
 
