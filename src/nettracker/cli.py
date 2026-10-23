@@ -4,12 +4,14 @@ import argparse
 import logging
 import sys
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 
 from nettracker import __version__
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
 from nettracker.db.monitoring import MonitoringRepository
+from nettracker.db.retention import count_prunable, cutoff_for, prune_ping_samples
 from nettracker.discovery.collector import ScanMode, collect_observations, collect_passive
 from nettracker.discovery.mdns import mdns_hostname
 from nettracker.discovery.names import reverse_hostname
@@ -25,6 +27,7 @@ COMMANDS = {
     "check-config": "Validate the configuration and print a summary (secrets are never shown).",
     "init-db": "Create or upgrade the SQLite database schema.",
     "monitor-once": "Measure ICMP reachability for explicitly selected discovered devices.",
+    "prune-history": "Preview or delete old ping samples (preview only unless authorized).",
     "scan-once": "Discover scoped neighbors once and save observations.",
 }
 
@@ -57,6 +60,12 @@ def build_parser() -> argparse.ArgumentParser:
                 "--enable-monitoring",
                 action="store_true",
                 help="authorize ICMP packets; requires monitor.enabled=true",
+            )
+        if name == "prune-history":
+            sub.add_argument(
+                "--apply",
+                action="store_true",
+                help="actually delete old ping samples; requires retention.enabled=true",
             )
         if name == "scan-once":
             sub.add_argument(
@@ -92,6 +101,10 @@ def _check_config(settings: Settings) -> int:
     print(f"known_devices: {len(settings.known_devices)} configured MAC address(es)")
     print(f"database_path: {settings.database_path}")
     print(f"scan: mode={settings.scan.mode} interval={settings.scan.interval_seconds}s")
+    print(
+        f"retention: enabled={str(settings.retention.enabled).lower()} "
+        f"keep_days={settings.retention.keep_days}"
+    )
     print(f"alerts: dry_run={str(settings.alerts.dry_run).lower()}")
     print(f"api: {settings.api.host}:{settings.api.port} (token: {token_state})")
     return 0
@@ -105,6 +118,32 @@ def _init_db(settings: Settings) -> int:
         conn.close()
     logger.info("database ready at %s", settings.database_path)
     print(f"Database ready: {settings.database_path} (schema version {version})")
+    return 0
+
+
+def _prune_history(settings: Settings, apply: bool) -> int:
+    if apply and not settings.retention.enabled:
+        raise ConfigError("pruning requires retention.enabled=true and --apply")
+    cutoff = cutoff_for(datetime.now(UTC), settings.retention.keep_days)
+    conn = connect(settings.database_path)
+    try:
+        migrate(conn)
+        prunable = count_prunable(conn, cutoff)
+        if not apply:
+            print(
+                f"Preview only: {prunable} ping sample(s) older than "
+                f"{settings.retention.keep_days} day(s) would be deleted; nothing was changed"
+            )
+            return 0
+        deleted = prune_ping_samples(
+            conn,
+            cutoff,
+            batch_size=settings.retention.batch_size,
+            max_batches=settings.retention.max_batches,
+        )
+    finally:
+        conn.close()
+    print(f"Pruning complete: {deleted} ping sample(s) deleted; other data untouched")
     return 0
 
 
@@ -241,6 +280,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _check_config(settings)
         if args.command == "init-db":
             return _init_db(settings)
+        if args.command == "prune-history":
+            return _prune_history(settings, args.apply)
         if args.command == "monitor-once":
             if not args.enable_monitoring or not settings.monitor.enabled:
                 raise ConfigError(
