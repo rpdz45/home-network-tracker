@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Connexion · Home Network Tracker{% endblock %}
+{% block content %}
+<h1>Connexion</h1>
+{% if error %}<p class="badge bad">Jeton invalide.</p>{% endif %}
+<form method="post" action="/login">
+<label>Jeton d'accès <input type="password" name="token" autocomplete="current-password" required></label>
+<button type="submit">Se connecter</button>
+</form>
+<p class="note">Le jeton est celui défini dans <code>NETTRACKER_API_TOKEN</code>. La connexion HTTP n'est pas chiffrée : n'expose ce tableau de bord que sur un réseau de confiance.</p>
+{% endblock %}

@@ -7,6 +7,8 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
+import uvicorn
+
 from nettracker import __version__
 from nettracker.alerts.engine import process_pending_events
 from nettracker.config import Settings, load_settings
@@ -22,10 +24,12 @@ from nettracker.discovery.strategy import discover_with_fallback
 from nettracker.discovery.vendor import parse_ma_l_csv
 from nettracker.errors import ConfigError, NetTrackerError
 from nettracker.monitor.service import monitor_once
+from nettracker.web.app import create_app
 
 logger = logging.getLogger("nettracker")
 
 STALE_EXIT_CODE = 3
+LOOPBACK_HOSTS = ("127.0.0.1", "::1", "localhost")
 
 COMMANDS = {
     "check-config": "Validate the configuration and print a summary (secrets are never shown).",
@@ -35,6 +39,7 @@ COMMANDS = {
     "process-alerts": "Record alerts for new events (dry-run by default; nothing is sent).",
     "prune-history": "Preview or delete old ping samples (preview only unless authorized).",
     "scan-once": "Discover scoped neighbors once and save observations.",
+    "serve": "Serve the read-only local dashboard (loopback unless configured).",
 }
 
 
@@ -171,6 +176,20 @@ def _process_alerts(settings: Settings) -> int:
         f"Alerts processed ({mode}): {summary.processed} event(s): "
         f"{summary.dry_run} dry-run, {summary.sent} sent, "
         f"{summary.suppressed} suppressed, {summary.failed} failed"
+    )
+    return 0
+
+
+def _serve(settings: Settings) -> int:
+    if not settings.database_path.is_file():
+        raise ConfigError("database not found: run 'nettracker init-db' first")
+    if settings.api.host not in LOOPBACK_HOSTS:
+        logger.warning("dashboard is exposed beyond loopback over plain HTTP (token required)")
+    uvicorn.run(
+        create_app(settings),
+        host=settings.api.host,
+        port=settings.api.port,
+        log_level=settings.log_level.lower(),
     )
     return 0
 
@@ -338,6 +357,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _health_check(settings)
         if args.command == "process-alerts":
             return _process_alerts(settings)
+        if args.command == "serve":
+            return _serve(settings)
         if args.command == "prune-history":
             return _prune_history(settings, args.apply)
         if args.command == "monitor-once":

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Appareils · Home Network Tracker{% endblock %}
+{% block content %}
+<h1>Appareils</h1>
+<p><span class="badge {{ health_class }}">Collecteur : {{ health_label }}</span>
+{% if health.last_success_at %}<span class="note"> dernier scan réussi : {{ health.last_success_at }}</span>{% endif %}</p>
+<table>
+<thead><tr><th>Nom</th><th>MAC</th><th>IP</th><th>Fabricant</th><th>Statut</th><th>ICMP</th><th>Vu pour la dernière fois</th></tr></thead>
+<tbody>
+{% for d in devices %}
+<tr>
+<td><a href="/devices/{{ d['id'] }}">{{ d['alias'] or d['hostname'] or '—' }}</a></td>
+<td><code>{{ d['mac'] }}</code>{% if d['is_randomized_mac'] %} <span class="note">(MAC privée)</span>{% endif %}</td>
+<td>{{ d['ip'] or '—' }}</td>
+<td>{{ d['vendor'] or '—' }}</td>
+<td><span class="badge">{{ d['status'] }}</span></td>
+<td>{% if d['ping_online'] is none %}—{% elif d['ping_online'] %}répond{% else %}sans réponse{% endif %}</td>
+<td>{{ d['last_seen'] }}</td>
+</tr>
+{% else %}
+<tr><td colspan="7">Aucun appareil enregistré. Lance <code>nettracker scan-once</code>.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<p class="note">Lecture seule. Une réponse ICMP n'est pas une preuve d'identité ; l'absence de réponse n'est pas une preuve de déconnexion.</p>
+{% endblock %}
