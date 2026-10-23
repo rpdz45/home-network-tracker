@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Événements · Home Network Tracker{% endblock %}
+{% block content %}
+<h1>Événements récents</h1>
+<table>
+<thead><tr><th>Date</th><th>Type</th><th>Appareil</th><th>Alertes</th><th>Détails</th></tr></thead>
+<tbody>
+{% for e in events %}
+<tr>
+<td>{{ e['created_at'] }}</td>
+<td>{{ e['kind'] }}</td>
+<td>{% if e['device_id'] %}<a href="/devices/{{ e['device_id'] }}">{{ e['alias'] or e['hostname'] or e['mac'] }}</a>{% else %}—{% endif %}</td>
+<td>{{ e['statuses'] or '—' }}</td>
+<td><code>{{ e['details'] or '' }}</code></td>
+</tr>
+{% else %}
+<tr><td colspan="5">Aucun événement.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<p class="note">Les alertes sont des enregistrements locaux : <code>dry_run</code> signifie que rien n'a été envoyé.</p>
+{% endblock %}

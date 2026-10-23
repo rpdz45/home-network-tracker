@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Home Network Tracker{% endblock %}</title>
+<style>
+body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #1d2330; }
+header { background: #1d2330; color: #fff; padding: .75rem 1.25rem; display: flex; gap: 1.25rem; }
+header a { color: #cfe3ff; text-decoration: none; }
+main { max-width: 72rem; margin: 1.25rem auto; padding: 0 1rem; }
+table { border-collapse: collapse; width: 100%; background: #fff; margin-bottom: 1.5rem; }
+th, td { border-bottom: 1px solid #e3e6ec; padding: .45rem .6rem; text-align: left; font-size: .92rem; }
+th { background: #eef1f6; }
+.badge { display: inline-block; padding: .05rem .5rem; border-radius: .6rem; background: #e3e6ec; }
+.ok { background: #d6f5df; }
+.warn { background: #ffe9b8; }
+.bad { background: #ffd0d0; }
+.note { color: #5a6475; font-size: .85rem; }
+code { font-size: .85rem; }
+dl { display: grid; grid-template-columns: 12rem 1fr; gap: .3rem 1rem; background: #fff; padding: 1rem; }
+dt { color: #5a6475; }
+dd { margin: 0; }
+input, button { font-size: 1rem; padding: .4rem .6rem; }
+</style>
+</head>
+<body>
+<header><strong>Home Network Tracker</strong><a href="/">Appareils</a><a href="/events">Événements</a></header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
