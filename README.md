@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : découverte M2 et premier lot de suivi M3 disponibles.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse / mDNS optionnelle, les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le cycle ICMP explicite `monitor-once` est disponible. Le suivi périodique et la rétention (reste de M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : découverte M2, premier lot de suivi M3 et rétention disponibles.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse / mDNS optionnelle, les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le cycle ICMP explicite `monitor-once` et la commande `prune-history` (aperçu par défaut, suppression en double opt-in) sont disponibles. Le suivi périodique (reste de M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -64,6 +64,7 @@ nettracker check-config [--config CHEMIN]
 nettracker init-db [--config CHEMIN]
 nettracker scan-once [--config CHEMIN] [--resolve-names] [--resolve-mdns] [--oui-file CHEMIN]
 nettracker monitor-once [--config CHEMIN] --device-id ID [--device-id ID] --enable-monitoring
+nettracker prune-history [--config CHEMIN] [--apply]
 ```
 
 `init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque. `scan-once` lit le cache de voisins par défaut. La résolution DNS inverse reste désactivée sans `--resolve-names` et peut émettre des requêtes via le résolveur système. Le mode ARP actif exige en plus `scan.mode = "active"`, `--enable-active` et une cible `--target` explicitement autorisée. Le repli nmap reste désactivé sans `scan.nmap_fallback = true` ; il ne sert qu’après un échec de l’ARP brut et conserve les mêmes garde-fous de cible. Voir [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md).
@@ -149,5 +150,27 @@ les IPv4 doivent être privées, autorisées et récemment découvertes. Les mes
 latence/perte et les transitions sont locales dans SQLite (migration V2 additive).
 Une non-réponse n'est pas une preuve de déconnexion : un pare-feu peut bloquer ICMP.
 Voir [docs/M3_MONITORING.md](docs/M3_MONITORING.md) pour configuration, commandes,
-droits système, tests simulés et limites. Pas encore de planification ni de rétention ;
-aucune validation sur réseau ou matériel réel n'a été effectuée pour ce lot.
+droits système, tests simulés et limites. Pas encore de planification ; aucune
+validation sur réseau ou matériel réel n'a été effectuée pour ce lot.
+
+## Rétention de l'historique (M3)
+
+`prune-history` supprime les anciens échantillons ping (latence / perte de paquets) pour éviter que la base grossisse indéfiniment. Seules les lignes `sightings` dont la source est `ping` sont concernées : appareils, observations de découverte, états courants, événements et notifications ne sont jamais supprimés.
+
+```toml
+[retention]
+enabled = false     # doit passer à true pour autoriser la suppression
+keep_days = 30      # échantillons strictement plus vieux que N jours (1 à 3650)
+batch_size = 500    # lignes par transaction (1 à 5000)
+max_batches = 100   # lots maximum par exécution (1 à 1000)
+```
+
+```bash
+# Aperçu en lecture seule (comportement par défaut) : rien n'est modifié
+nettracker prune-history --config config.toml
+
+# Suppression réelle : exige retention.enabled = true ET --apply
+nettracker prune-history --config config.toml --apply
+```
+
+Sans `retention.enabled = true`, `--apply` est refusé avec un message d'erreur. Une exécution supprime au plus `batch_size × max_batches` lignes ; relance la commande si l'aperçu en annonce davantage. Pas de planification automatique (cron / service : lot ultérieur). Sauvegarde ta base avant la première suppression réelle. Aucune validation sur matériel réel n'a été effectuée pour ce lot ; seuls les tests unitaires le couvrent.

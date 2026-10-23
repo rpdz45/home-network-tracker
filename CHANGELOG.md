@@ -5,6 +5,10 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ver
 ## [Non publié]
 
 ### Ajouté
+- M3 : commande `prune-history` : aperçu en lecture seule par défaut ; suppression réelle seulement avec `retention.enabled=true` **et** `--apply`. Seuls les échantillons ping sont supprimés (lots bornés, une transaction par lot) ; appareils, observations de découverte, états, événements et notifications ne sont jamais touchés.
+- M3 : section de configuration `[retention]` validée (`enabled`, `keep_days`, `batch_size`, `max_batches`), désactivée par défaut ; résumé affiché par `check-config`.
+- M3 : cycle ICMP explicite `monitor-once` (double opt-in `monitor.enabled` + `--enable-monitoring`) et migration SQLite V2 additive (`sightings.source`, `monitor_state`).
+- M2 : découverte passive (cache de voisins), ARP actif explicitement autorisé, repli nmap optionnel, fabricants OUI locaux, DNS inverse et mDNS ciblé en opt-in, liste blanche `known_devices`, suggestions prudentes pour MAC aléatoires.
 - M1 : configuration TOML validée (`allowed_subnets` limité aux plages privées RFC 1918 de préfixe /16 ou plus long, API sur loopback sauf jeton), surcharge par variables d'environnement et `.env`.
 - M1 : schéma SQLite v1 versionné avec migrations transactionnelles (`src/nettracker/db/migrations.py`, identique au schéma de `docs/ARCHITECTURE.md`).
 - M1 : couche repository typée et idempotente (appareils, scans, observations, événements, notifications), horodatages UTC obligatoires, MAC normalisées.

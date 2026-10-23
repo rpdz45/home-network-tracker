@@ -54,3 +54,15 @@ Une réponse ICMP n'authentifie pas la MAC et une absence de réponse ne prouve 
 une déconnexion. Les erreurs locales sont séparées des non-réponses. Les limites
 Windows/locales, pare-feu et DHCP sont détaillées dans [M3_MONITORING.md](M3_MONITORING.md).
 Sauvegarder la base avant la migration V2 ; l'ancien programme refusera ce schéma.
+
+## Suppression de l'historique (`prune-history`)
+
+`prune-history` est la seule commande qui supprime des données. Elle est conçue pour être difficile à déclencher par erreur :
+
+- **Aperçu par défaut** : sans `--apply`, la commande compte seulement les échantillons concernés et ne modifie rien.
+- **Double opt-in** : la suppression exige `retention.enabled = true` dans la config **et** `--apply` en ligne de commande. `--apply` sans `retention.enabled` est refusé avec une erreur de configuration.
+- **Périmètre strict** : seules les lignes `sightings` avec `source = 'ping'` plus anciennes que `retention.keep_days` sont supprimées. Appareils, observations de découverte, états de suivi, événements et notifications ne sont jamais touchés.
+- **Suppression bornée** : lots de `retention.batch_size` lignes, une transaction par lot, au plus `retention.max_batches` lots par exécution, pour limiter les verrous SQLite.
+- **Aucun accès réseau** et aucun privilège particulier : la commande lit et écrit uniquement la base locale. Requêtes SQL paramétrées, aucune chaîne construite à partir d'entrées utilisateur.
+
+La suppression est définitive : sauvegarde la base avant la première exécution avec `--apply`. Une clé de configuration invalide (valeurs hors bornes) est refusée au chargement.
