@@ -103,7 +103,9 @@ def _build_message(
         details = json.loads(raw_details) if raw_details else {}
     except ValueError:
         details = {}
-    last_success = details.get("last_success_at", "inconnu") if isinstance(details, dict) else "inconnu"
+    last_success = "inconnu"
+    if isinstance(details, dict):
+        last_success = details.get("last_success_at", "inconnu")
     text = _TEXTS[kind].format(label=_label(conn, device_id), last_success=last_success)
     return AlertMessage(event_id, kind, SEVERITY[kind], text)
 
