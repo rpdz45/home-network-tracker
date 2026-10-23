@@ -50,8 +50,13 @@ max_batches = 100
 stale_after_minutes = 15
 
 [alerts]
-# While true, no notification is ever sent.
+# While true, `nettracker process-alerts` only records dry-run rows: nothing is ever sent.
+# false needs a configured notifier (none exists yet), otherwise the command refuses to run.
 dry_run = true
+# Same event kind on the same device alerts at most once per this many minutes (1 to 1440).
+cooldown_minutes = 30
+# Events handled per `process-alerts` run (1 to 1000).
+max_events_per_run = 200
 
 [api]
 # Keep loopback unless you set NETTRACKER_API_TOKEN in .env.

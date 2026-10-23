@@ -2,7 +2,7 @@
 
 Outil local de suivi du réseau domestique : découverte des appareils, suivi de disponibilité (latence, perte de paquets), détection des appareils inconnus et dashboard web local. Toutes les données restent sur ta machine (SQLite).
 
-> **Statut : découverte M2, premier lot de suivi M3, rétention et santé du collecteur disponibles.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse / mDNS optionnelle, les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le cycle ICMP explicite `monitor-once`, la commande `prune-history` (aperçu par défaut, suppression en double opt-in) et la commande `health-check` sont disponibles. Le suivi périodique (reste de M3), les alertes (M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
+> **Statut : découverte M2, premier lot de suivi M3, rétention, santé du collecteur et premier lot d'alertes M4 disponibles.** La configuration, SQLite, la découverte passive, l’ARP actif explicitement autorisé, le repli nmap optionnel et borné, les fabricants OUI locaux, la résolution DNS inverse / mDNS optionnelle, les suggestions prudentes pour MAC aléatoires et la liste blanche `known_devices` fonctionnent. Le cycle ICMP explicite `monitor-once`, `prune-history` (aperçu par défaut, suppression en double opt-in), `health-check` et `process-alerts` (dry-run, anti-spam, aucun envoi) sont disponibles. Le suivi périodique (reste de M3), les notifiers Discord / Telegram / e-mail et les règles d'alertes avancées (reste de M4) et le dashboard (M5) ne sont pas encore implémentés. Voir la feuille de route dans `AGENTS.md` (section 8).
 
 ## Avertissement
 
@@ -66,6 +66,7 @@ nettracker scan-once [--config CHEMIN] [--resolve-names] [--resolve-mdns] [--oui
 nettracker monitor-once [--config CHEMIN] --device-id ID [--device-id ID] --enable-monitoring
 nettracker prune-history [--config CHEMIN] [--apply]
 nettracker health-check [--config CHEMIN]
+nettracker process-alerts [--config CHEMIN]
 ```
 
 `init-db` crée ou met à jour le schéma SQLite ; il peut être relancé sans risque. `scan-once` lit le cache de voisins par défaut. La résolution DNS inverse reste désactivée sans `--resolve-names` et peut émettre des requêtes via le résolveur système. Le mode ARP actif exige en plus `scan.mode = "active"`, `--enable-active` et une cible `--target` explicitement autorisée. Le repli nmap reste désactivé sans `scan.nmap_fallback = true` ; il ne sert qu’après un échec de l’ARP brut et conserve les mêmes garde-fous de cible. Voir [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md).
@@ -91,6 +92,7 @@ La CI GitHub exécute les mêmes contrôles sur Linux et Windows.
 - [docs/M2_PASSIVE.md](docs/M2_PASSIVE.md)
 - [docs/M3_MONITORING.md](docs/M3_MONITORING.md)
 - [docs/M3_HEALTH.md](docs/M3_HEALTH.md)
+- [docs/M4_ALERTS.md](docs/M4_ALERTS.md)
 - [AGENTS.md](AGENTS.md) : règles de travail pour les agents IA
 
 ## Licence
@@ -186,3 +188,13 @@ nettracker health-check --config config.toml
 ```
 
 La commande n'envoie aucune notification (alertes : M4) et ne tourne pas toute seule : planifie-la toi-même. Voir [docs/M3_HEALTH.md](docs/M3_HEALTH.md) pour le fonctionnement, les limites et les tests. Aucune validation sur matériel réel n'a été effectuée pour ce lot.
+
+## Alertes (M4, lot 1)
+
+`process-alerts` transforme les événements déjà enregistrés (nouvel appareil, collecteur périmé, hors ligne, latence, fusion suggérée) en lignes `notifications`, avec un anti-spam par type et appareil (`alerts.cooldown_minutes`, 30 minutes par défaut). Les appareils à MAC aléatoire en attente de confirmation (`to_confirm`) ne déclenchent jamais d'alerte.
+
+```bash
+nettracker process-alerts --config config.toml
+```
+
+**Rien n'est envoyé** : tant que `alerts.dry_run = true` (défaut), la commande enregistre seulement des lignes `dry_run`, et le mode réel est refusé car aucun notifier (Discord, Telegram, e-mail) n'est encore livré. La commande est relançable sans doublon et ne tourne pas toute seule. Voir [docs/M4_ALERTS.md](docs/M4_ALERTS.md). Aucune validation sur matériel réel n'a été effectuée pour ce lot.

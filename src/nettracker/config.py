@@ -82,6 +82,8 @@ class AlertSettings(_Model):
     """Alert settings. Dry-run is the default: nothing is sent until it is turned off."""
 
     dry_run: bool = True
+    cooldown_minutes: int = Field(default=30, ge=1, le=1440)
+    max_events_per_run: int = Field(default=200, ge=1, le=1000)
 
 
 def _is_loopback(host: str) -> bool:
