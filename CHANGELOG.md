@@ -5,6 +5,7 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/). Ver
 ## [Non publié]
 
 ### Ajouté
+- M4 (lot 1) : moteur d'alertes sans envoi réseau. Commande `process-alerts` : enregistre une ligne `notifications` par événement alertable (`new_device`, `collector_stale`, `offline`, `latency_high`, `merge_suggested`), en `dry_run` par défaut, avec anti-spam par type et appareil (`alerts.cooldown_minutes`, 30) et limite par exécution (`alerts.max_events_per_run`, 200). `to_confirm` et `online` n'alertent pas. Le mode réel exige des notifiers (pas encore livrés).
 - M3 : commande `health-check` : dernier scan réussi, ancienneté, problèmes récents ; code de sortie 3 si le collecteur est périmé. Enregistre un événement `collector_stale` une seule fois par panne (réarmé par un scan réussi), sans notification ni migration. Section `[health]` (`stale_after_minutes`, défaut 15).
 - M3 : commande `prune-history` : aperçu en lecture seule par défaut ; suppression réelle seulement avec `retention.enabled=true` **et** `--apply`. Seuls les échantillons ping sont supprimés (lots bornés, une transaction par lot) ; appareils, observations de découverte, états, événements et notifications ne sont jamais touchés.
 - M3 : section de configuration `[retention]` validée (`enabled`, `keep_days`, `batch_size`, `max_batches`), désactivée par défaut ; résumé affiché par `check-config`.

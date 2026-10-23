@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from nettracker import __version__
+from nettracker.alerts.engine import process_pending_events
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
 from nettracker.db.health import collector_health, record_stale_event
@@ -31,6 +32,7 @@ COMMANDS = {
     "health-check": "Report collector health; record a collector_stale event once per outage.",
     "init-db": "Create or upgrade the SQLite database schema.",
     "monitor-once": "Measure ICMP reachability for explicitly selected discovered devices.",
+    "process-alerts": "Record alerts for new events (dry-run by default; nothing is sent).",
     "prune-history": "Preview or delete old ping samples (preview only unless authorized).",
     "scan-once": "Discover scoped neighbors once and save observations.",
 }
@@ -110,7 +112,10 @@ def _check_config(settings: Settings) -> int:
         f"keep_days={settings.retention.keep_days}"
     )
     print(f"health: stale_after_minutes={settings.health.stale_after_minutes}")
-    print(f"alerts: dry_run={str(settings.alerts.dry_run).lower()}")
+    print(
+        f"alerts: dry_run={str(settings.alerts.dry_run).lower()} "
+        f"cooldown_minutes={settings.alerts.cooldown_minutes}"
+    )
     print(f"api: {settings.api.host}:{settings.api.port} (token: {token_state})")
     return 0
 
@@ -152,6 +157,22 @@ def _health_check(settings: Settings) -> int:
     if created:
         print("Event collector_stale recorded; no notification is sent by this command")
     return STALE_EXIT_CODE if health.stale else 0
+
+
+def _process_alerts(settings: Settings) -> int:
+    conn = connect(settings.database_path)
+    try:
+        migrate(conn)
+        summary = process_pending_events(conn, settings.alerts, datetime.now(UTC))
+    finally:
+        conn.close()
+    mode = "dry-run" if settings.alerts.dry_run else "live"
+    print(
+        f"Alerts processed ({mode}): {summary.processed} event(s): "
+        f"{summary.dry_run} dry-run, {summary.sent} sent, "
+        f"{summary.suppressed} suppressed, {summary.failed} failed"
+    )
+    return 0
 
 
 def _prune_history(settings: Settings, apply: bool) -> int:
@@ -315,6 +336,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _init_db(settings)
         if args.command == "health-check":
             return _health_check(settings)
+        if args.command == "process-alerts":
+            return _process_alerts(settings)
         if args.command == "prune-history":
             return _prune_history(settings, args.apply)
         if args.command == "monitor-once":
