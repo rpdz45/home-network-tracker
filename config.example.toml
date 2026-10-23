@@ -34,6 +34,16 @@ timeout_seconds = 1.0
 # Refuse stale discovery records (60 to 86400 seconds).
 max_observation_age_seconds = 1800
 
+[retention]
+# Deleting old ping samples requires enabled = true AND `nettracker prune-history --apply`.
+# Without --apply the command only previews. Only ping samples are ever deleted.
+enabled = false
+# Ping samples strictly older than this many days are prunable (1 to 3650).
+keep_days = 30
+# Rows deleted per transaction (1 to 5000) and maximum batches per run (1 to 1000).
+batch_size = 500
+max_batches = 100
+
 [alerts]
 # While true, no notification is ever sent.
 dry_run = true
