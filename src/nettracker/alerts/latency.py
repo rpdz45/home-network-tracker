@@ -20,10 +20,7 @@ _LATEST_SQL = (
     "WHERE device_id = ? AND source = 'ping' AND latency_ms IS NOT NULL "
     "ORDER BY seen_at DESC, id DESC LIMIT ?"
 )
-_LAST_EVENT_SQL = (
-    "SELECT MAX(created_at) FROM events "
-    "WHERE kind = 'latency_high' AND device_id = ?"
-)
+_LAST_EVENT_SQL = "SELECT MAX(created_at) FROM events WHERE kind = 'latency_high' AND device_id = ?"
 _NORMAL_SINCE_SQL = (
     "SELECT 1 FROM sightings WHERE device_id = ? AND source = 'ping' "
     "AND latency_ms <= ? AND seen_at > ? LIMIT 1"
