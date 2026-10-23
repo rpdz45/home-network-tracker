@@ -57,6 +57,11 @@ dry_run = true
 cooldown_minutes = 30
 # Events handled per `process-alerts` run (1 to 1000).
 max_events_per_run = 200
+# An `offline` event alerts only once this old, and not if the device came back (0 to 1440).
+# 0 alerts immediately.
+offline_after_minutes = 5
+# Alert when the mean of the last 3 answered pings exceeds this many ms (1 to 60000).
+latency_high_ms = 200
 
 [api]
 # Keep loopback unless you set NETTRACKER_API_TOKEN in .env.
