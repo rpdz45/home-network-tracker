@@ -84,6 +84,8 @@ class AlertSettings(_Model):
     dry_run: bool = True
     cooldown_minutes: int = Field(default=30, ge=1, le=1440)
     max_events_per_run: int = Field(default=200, ge=1, le=1000)
+    offline_after_minutes: int = Field(default=5, ge=0, le=1440)
+    latency_high_ms: int = Field(default=200, ge=1, le=60_000)
 
 
 def _is_loopback(host: str) -> bool:
