@@ -12,7 +12,9 @@ MAX_ALIAS_LENGTH = 120
 
 def _alias(value: str) -> str | None:
     cleaned = value.strip()
-    if len(cleaned) > MAX_ALIAS_LENGTH or any(ord(char) < 32 or ord(char) == 127 for char in cleaned):
+    if len(cleaned) > MAX_ALIAS_LENGTH or any(
+        ord(char) < 32 or ord(char) == 127 for char in cleaned
+    ):
         raise ValueError("alias must contain at most 120 characters and no control characters")
     return cleaned or None
 
