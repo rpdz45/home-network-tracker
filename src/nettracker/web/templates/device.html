@@ -36,6 +36,7 @@
 {% elif device['merged_into'] is none %}
 <p class="note">Configure un jeton API pour activer les modifications, même en local.</p>
 {% endif %}
+{% include "history.html" %}
 <h2>Dernières mesures</h2>
 <table>
 <thead><tr><th>Source</th><th>IP</th><th>En ligne</th><th>Latence (ms)</th><th>Perte (%)</th><th>Date</th></tr></thead>
