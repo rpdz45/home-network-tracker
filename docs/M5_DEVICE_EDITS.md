@@ -1,19 +1,9 @@
-# M5 — Gestion des appareils : persistance (lot préparatoire)
+# M5 — Persistance des modifications d’appareils
 
-Lié à l’issue #2. Ce lot ne livre pas encore les formulaires ou les routes HTTP. Le dashboard reste en lecture seule. Aucune migration n’est nécessaire : alias et device_type existent déjà.
+Lié à l’issue #2. Le formulaire et la route HTTP sont maintenant décrits dans M5_DASHBOARD.md ; la présente note décrit uniquement la couche SQLite. Aucune migration supplémentaire : alias et device_type existent déjà.
 
-## Interfaces
+`update_identity(conn, device_id, alias=..., device_type=...)` remplace les deux champs atomiquement. Un alias vide est enregistré à NULL pour conserver le repli nom d’hôte puis MAC ; limite de 120 caractères sans contrôles ASCII. Types : computer, phone, network, iot, tv, nas, camera, other, ou vide.
 
-- `update_identity(conn, device_id, alias=..., device_type=...)` remplace les deux champs atomiquement. Un alias vide est enregistré à NULL pour conserver le repli d’affichage existant (nom d’hôte, puis MAC). Alias limité à 120 caractères, sans contrôles ASCII ; types : computer, phone, network, iot, tv, nas, camera, other, ou vide.
-- `mark_known(conn, device_id)` persiste le statut known et reste idempotent. Les appareils ignorés ou fusionnés ne sont pas reclassés implicitement. Les événements historiques, MAC, observations et règles de scan restent inchangés.
-- Appareil absent : LookupError ; champ invalide ou appareil fusionné : ValueError ; problème SQLite : DatabaseError générique.
+`mark_known(conn, device_id)` est idempotent. Il refuse les appareils ignorés ou fusionnés. Les événements historiques et règles de scan restent inchangés. Appareil absent : LookupError ; données invalides : ValueError ; erreur SQLite : DatabaseError générique. Les savepoints respectent les transactions englobantes.
 
-## Décision technique et sécurité
-
-Les écritures utilisent des paramètres SQL et un savepoint ; une transaction englobante peut toujours annuler la modification. Ces fonctions n’accordent aucune autorisation HTTP. Le futur adaptateur web devra exiger un jeton même sur loopback pour les écritures, une protection CSRF, des corps bornés et une validation stricte. Les connexions de lecture existantes conservent query_only. Un statut known est un classement manuel, jamais une authentification de l’appareil.
-
-## Validation et limites
-
-Neuf tests SQLite en mémoire, schéma minimal isolé, sans réseau. Exécution ciblée du code avec un substitut de DatabaseError dans l’environnement de calcul : neuf succès ; ce résultat ne valide ni les imports du paquet complet ni les migrations réelles. Aucun test matériel, navigateur ou LAN. Ruff, mypy, bandit, audit des dépendances, gitleaks et suite complète non exécutés pour ce lot : à vérifier avant toute fusion.
-
-Commande de validation dans le dépôt installé : `pytest tests/unit/test_device_edits.py -vv`. Puis exécuter toutes les vérifications de la CI. Ne pas fermer l’issue #2 avant livraison et tests des routes et formulaires.
+Neuf tests SQLite isolés ont été exécutés lors du premier lot ; sa CI Linux/Windows a ensuite réussi. Cela ne valide pas automatiquement les nouvelles routes HTTP. Les nouveaux tests HTTP et toute la CI doivent être relancés pour le commit qui raccorde les formulaires. Aucun test matériel réel. Le statut connu est un classement manuel, jamais une authentification.

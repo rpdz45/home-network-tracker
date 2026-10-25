@@ -12,6 +12,30 @@
 <dt>Première observation</dt><dd>{{ device['first_seen'] }}</dd>
 <dt>Dernière observation</dt><dd>{{ device['last_seen'] }}</dd>
 </dl>
+{% if can_edit %}
+<section aria-labelledby="edit-title">
+<h2 id="edit-title">Modifier cet appareil</h2>
+<form method="post" action="/devices/{{ device['id'] }}/edit">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<p><label for="alias">Nom personnalisé (120 caractères maximum)</label><br>
+<input id="alias" name="alias" maxlength="120" value="{{ device['alias'] or '' }}"></p>
+<p><label for="device-type">Type</label><br>
+<select id="device-type" name="device_type">
+<option value="">Non renseigné</option>
+{% for kind in device_types %}
+<option value="{{ kind }}"{% if device['device_type'] == kind %} selected{% endif %}>{{ {'computer': 'Ordinateur', 'phone': 'Téléphone', 'network': 'Équipement réseau', 'iot': 'Objet connecté', 'tv': 'Télévision', 'nas': 'NAS', 'camera': 'Caméra', 'other': 'Autre'}[kind] }}</option>
+{% endfor %}
+</select></p>
+{% if device['status'] not in ['known', 'ignored'] %}
+<p><label><input type="checkbox" name="mark_known" value="yes"> Marquer comme connu</label></p>
+{% endif %}
+<p class="note">Un statut connu est un classement manuel, pas une authentification.</p>
+<button type="submit">Enregistrer les modifications</button>
+</form>
+</section>
+{% elif device['merged_into'] is none %}
+<p class="note">Configure un jeton API pour activer les modifications, même en local.</p>
+{% endif %}
 <h2>Dernières mesures</h2>
 <table>
 <thead><tr><th>Source</th><th>IP</th><th>En ligne</th><th>Latence (ms)</th><th>Perte (%)</th><th>Date</th></tr></thead>

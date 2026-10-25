@@ -1,5 +1,6 @@
-"""Read-only local dashboard (FastAPI + Jinja2). It never scans and never writes."""
+"""Local dashboard with authenticated device edits. It never scans the network."""
 
+import hmac
 import logging
 import secrets
 import sqlite3
@@ -12,8 +13,11 @@ from urllib.parse import parse_qs
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from nettracker.config import Settings
+from nettracker.db import Repository, connect
+from nettracker.db.device_edits import DEVICE_TYPES, mark_known, update_identity
 from nettracker.db.health import CollectorHealth, collector_health
 from nettracker.errors import NetTrackerError
 from nettracker.web import queries
@@ -59,10 +63,31 @@ def _health_view(health: CollectorHealth) -> tuple[str, str]:
 async def _read_limited(request: Request, limit: int) -> bytes | None:
     body = bytearray()
     async for chunk in request.stream():
-        body.extend(chunk)
-        if len(body) > limit:
+        if len(body) + len(chunk) > limit:
             return None
+        body.extend(chunk)
     return bytes(body)
+
+
+def _save_device(settings: Settings, device_id: int, form: dict[str, list[str]]) -> None:
+    check = queries.open_readonly(settings.database_path)
+    check.close()
+    conn = connect(settings.database_path)
+    try:
+        with Repository(conn).transaction():
+            update_identity(
+                conn, device_id, alias=form["alias"][0], device_type=form["device_type"][0]
+            )
+            if form.get("mark_known") == ["yes"]:
+                mark_known(conn, device_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Appareil introuvable") from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail="Modification invalide ou appareil non modifiable"
+        ) from exc
+    finally:
+        conn.close()
 
 
 def create_app(
@@ -70,10 +95,14 @@ def create_app(
     *,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> FastAPI:
-    """Build the dashboard. Without a configured token it is meant for loopback only."""
+    """Build the dashboard; edits always require a configured credential, even on loopback."""
     expected = _expected_credential(settings)
+    csrf_key = secrets.token_bytes(32)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     app = FastAPI(title="Home Network Tracker", docs_url=None, redoc_url=None, openapi_url=None)
+
+    def csrf_for(device_id: int) -> str:
+        return hmac.digest(csrf_key, str(device_id).encode(), "sha256").hex()
 
     @contextmanager
     def database() -> Iterator[sqlite3.Connection]:
@@ -162,8 +191,44 @@ def create_app(
                 "device": device,
                 "sightings": queries.device_sightings(conn, device_id),
                 "events": queries.device_events(conn, device_id),
+                "can_edit": expected is not None and device["merged_into"] is None,
+                "csrf": csrf_for(device_id) if expected is not None else "",
+                "device_types": sorted(DEVICE_TYPES),
             }
         return templates.TemplateResponse(request, "device.html", context)
+
+    @protected.post("/devices/{device_id}/edit")
+    async def edit_device(request: Request, device_id: int) -> Response:
+        if expected is None:
+            raise HTTPException(
+                status_code=403, detail="Configurer un jeton pour modifier un appareil"
+            )
+        origin = request.headers.get("origin")
+        if origin is not None and origin != str(request.base_url).rstrip("/"):
+            raise HTTPException(status_code=403, detail="Origine refusée")
+        if request.headers.get("sec-fetch-site") == "cross-site":
+            raise HTTPException(status_code=403, detail="Origine refusée")
+        media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        if media_type != "application/x-www-form-urlencoded":
+            raise HTTPException(status_code=415, detail="Formulaire attendu")
+        body = await _read_limited(request, MAX_LOGIN_BYTES)
+        if body is None:
+            raise HTTPException(status_code=413, detail="Requête trop volumineuse")
+        try:
+            form = parse_qs(body.decode("utf-8"), keep_blank_values=True, max_num_fields=4)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Formulaire invalide") from exc
+        if (
+            not {"csrf", "alias", "device_type"}.issubset(form)
+            or not set(form).issubset({"csrf", "alias", "device_type", "mark_known"})
+            or any(len(values) != 1 for values in form.values())
+            or ("mark_known" in form and form["mark_known"] != ["yes"])
+        ):
+            raise HTTPException(status_code=422, detail="Champs invalides")
+        if not _matches(csrf_for(device_id), form["csrf"][0]):
+            raise HTTPException(status_code=403, detail="Protection CSRF invalide")
+        await run_in_threadpool(_save_device, settings, device_id, form)
+        return RedirectResponse(f"/devices/{device_id}", status_code=303)
 
     @protected.get("/events", response_class=HTMLResponse)
     def events_page(request: Request) -> Response:
