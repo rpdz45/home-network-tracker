@@ -8,6 +8,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Literal
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
@@ -21,6 +22,7 @@ from nettracker.db.device_edits import DEVICE_TYPES, mark_known, update_identity
 from nettracker.db.health import CollectorHealth, collector_health
 from nettracker.errors import NetTrackerError
 from nettracker.web import queries
+from nettracker.web.timeseries import load_series
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +184,9 @@ def create_app(
         return templates.TemplateResponse(request, "devices.html", context)
 
     @protected.get("/devices/{device_id}", response_class=HTMLResponse)
-    def device_page(request: Request, device_id: int) -> Response:
+    def device_page(
+        request: Request, device_id: int, window: Literal["24h", "7d"] = "24h"
+    ) -> Response:
         with database() as conn:
             device = queries.get_device(conn, device_id)
             if device is None:
@@ -194,6 +198,7 @@ def create_app(
                 "can_edit": expected is not None and device["merged_into"] is None,
                 "csrf": csrf_for(device_id) if expected is not None else "",
                 "device_types": sorted(DEVICE_TYPES),
+                "series": load_series(conn, device_id, clock(), window),
             }
         return templates.TemplateResponse(request, "device.html", context)
 
