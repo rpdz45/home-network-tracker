@@ -1,1 +1,1 @@
-"""Read-only local dashboard."""
+"""Local dashboard with authenticated device management."""
