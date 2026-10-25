@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Appareil · Home Network Tracker{% endblock %}
+{% block content %}
+<h1>{{ device['alias'] or device['hostname'] or device['mac'] }}</h1>
+<dl>
+<dt>Adresse MAC</dt><dd><code>{{ device['mac'] }}</code>{% if device['is_randomized_mac'] %} <span class="note">(MAC privée ou aléatoire)</span>{% endif %}</dd>
+<dt>Nom d'hôte</dt><dd>{{ device['hostname'] or '—' }}</dd>
+<dt>Alias</dt><dd>{{ device['alias'] or '—' }}</dd>
+<dt>Type</dt><dd>{{ device['device_type'] or '—' }}</dd>
+<dt>Fabricant</dt><dd>{{ device['vendor'] or '—' }}</dd>
+<dt>Statut</dt><dd><span class="badge">{{ device['status'] }}</span></dd>
+<dt>Première observation</dt><dd>{{ device['first_seen'] }}</dd>
+<dt>Dernière observation</dt><dd>{{ device['last_seen'] }}</dd>
+</dl>
+<h2>Dernières mesures</h2>
+<table>
+<thead><tr><th>Source</th><th>IP</th><th>En ligne</th><th>Latence (ms)</th><th>Perte (%)</th><th>Date</th></tr></thead>
+<tbody>
+{% for s in sightings %}
+<tr><td>{{ s['source'] }}</td><td>{{ s['ip'] }}</td><td>{{ 'oui' if s['online'] else 'non' }}</td><td>{{ s['latency_ms'] if s['latency_ms'] is not none else '—' }}</td><td>{{ s['packet_loss_pct'] if s['packet_loss_pct'] is not none else '—' }}</td><td>{{ s['seen_at'] }}</td></tr>
+{% else %}
+<tr><td colspan="6">Aucune mesure.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<h2>Événements</h2>
+<table>
+<thead><tr><th>Date</th><th>Type</th><th>Alertes</th><th>Détails</th></tr></thead>
+<tbody>
+{% for e in events %}
+<tr><td>{{ e['created_at'] }}</td><td>{{ e['kind'] }}</td><td>{{ e['statuses'] or '—' }}</td><td><code>{{ e['details'] or '' }}</code></td></tr>
+{% else %}
+<tr><td colspan="4">Aucun événement.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+<p><a href="/">← Retour aux appareils</a></p>
+{% endblock %}
