@@ -1,8 +1,8 @@
 """Validated device edits; callers must enforce authentication and CSRF protection."""
 
 import sqlite3
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 
 from nettracker.errors import DatabaseError
 
