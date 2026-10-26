@@ -21,9 +21,9 @@ def configuration(tmp_path: Path, *, enabled: bool = False) -> Path:
     path = tmp_path / "config.toml"
     path.write_text(
         'allowed_subnets = ["192.168.1.0/24"]\n'
-        f'database_path = {json.dumps(str(tmp_path / "history.db"))}\n'
-        '[retention]\nenabled = true\n'
-        f'[discovery_retention]\nenabled = {str(enabled).lower()}\nkeep_days = 30\n',
+        f"database_path = {json.dumps(str(tmp_path / 'history.db'))}\n"
+        "[retention]\nenabled = true\n"
+        f"[discovery_retention]\nenabled = {str(enabled).lower()}\nkeep_days = 30\n",
         encoding="utf-8",
     )
     return path
@@ -104,9 +104,7 @@ def test_missing_database_is_not_created(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("version", [0, LATEST_VERSION + 1])
-def test_incompatible_schema_is_not_migrated(
-    database: Path, tmp_path: Path, version: int
-) -> None:
+def test_incompatible_schema_is_not_migrated(database: Path, tmp_path: Path, version: int) -> None:
     conn = connect(database)
     try:
         conn.execute("UPDATE schema_version SET version=?", (version,))
