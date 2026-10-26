@@ -117,9 +117,7 @@ def test_dhcp_change_is_reloaded_on_next_cycle(scenario: Scenario) -> None:
     assert [row[0] for row in rows] == [IP, "192.168.1.21"]
 
 
-@pytest.mark.parametrize(
-    "ip", ["192.168.2.20", "8.8.8.8", "::1", "192.168.1.0", "192.168.1.255"]
-)
+@pytest.mark.parametrize("ip", ["192.168.2.20", "8.8.8.8", "::1", "192.168.1.0", "192.168.1.255"])
 def test_changed_target_is_revalidated_before_probe(scenario: Scenario, ip: str) -> None:
     def changed(seconds: float) -> bool:
         scenario.wait(seconds)
