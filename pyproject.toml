@@ -34,7 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-nettracker = "nettracker.cli:main"
+nettracker = "nettracker.entrypoint:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nettracker"]

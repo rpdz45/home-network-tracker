@@ -72,6 +72,15 @@ class RetentionSettings(_Model):
     max_batches: int = Field(default=100, ge=1, le=1000)
 
 
+class DiscoveryRetentionSettings(_Model):
+    """Separate, strictly typed authorization for pruning discovery history."""
+
+    enabled: bool = Field(default=False, strict=True)
+    keep_days: int = Field(default=30, ge=1, le=3650, strict=True)
+    batch_size: int = Field(default=500, ge=1, le=5000, strict=True)
+    max_batches: int = Field(default=100, ge=1, le=1000, strict=True)
+
+
 class HealthSettings(_Model):
     """Collector health: minutes without a successful scan before it is reported as stale."""
 
@@ -122,6 +131,9 @@ class Settings(_Model):
     scan: ScanSettings = Field(default_factory=ScanSettings)
     monitor: MonitorSettings = Field(default_factory=MonitorSettings)
     retention: RetentionSettings = Field(default_factory=RetentionSettings)
+    discovery_retention: DiscoveryRetentionSettings = Field(
+        default_factory=DiscoveryRetentionSettings
+    )
     health: HealthSettings = Field(default_factory=HealthSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
