@@ -117,7 +117,7 @@ class TimeSeriesTests(unittest.TestCase):
         self.assertEqual(bucket.status, "reply")
         self.assertEqual(bucket.mean_ms, 0.0)
         self.assertEqual(series.scale_ms, 1.0)
-        self.assertIn('height: 0.0%;', self.render())
+        self.assertIn("height: 0.0%;", self.render())
 
     def test_seven_days_includes_older_samples(self) -> None:
         self.add(NOW - timedelta(days=3))
