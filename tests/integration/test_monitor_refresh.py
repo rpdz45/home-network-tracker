@@ -75,9 +75,10 @@ def test_refresh_changes_ip_without_enrolling_unselected_devices(case: Case) -> 
     device = case.repo.get_device(1)
     assert device is not None and device.status == "unknown"
     probe = Mock(return_value=PingResult(1, 1, 1.0))
-    assert monitor_once(
-        case.repo, case.settings, [1], enabled=True, probe=probe, clock=lambda: NOW
-    ) == 1
+    assert (
+        monitor_once(case.repo, case.settings, [1], enabled=True, probe=probe, clock=lambda: NOW)
+        == 1
+    )
     probe.assert_called_once_with(NEW_IP)
     assert not case.conn.in_transaction
 
