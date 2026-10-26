@@ -57,6 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--config", type=Path)
     parser.add_argument("--device-id", type=int, action="append", required=True)
     parser.add_argument("--enable-monitoring", action="store_true")
+    parser.add_argument("--refresh-passive", action="store_true")
     parser.add_argument("--interval-seconds", type=int, default=60)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--cycles", type=int)
@@ -74,6 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from nettracker.db import LATEST_VERSION, connect
     from nettracker.db.monitoring import MonitoringRepository
     from nettracker.errors import ConfigError, NetTrackerError
+    from nettracker.monitor.refresh import refresh_selected
     from nettracker.monitor.service import monitor_once
 
     stopped = Event()
@@ -94,8 +96,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             if row is None or row[0] != LATEST_VERSION:
                 raise ConfigError("database schema is not current; run nettracker init-db")
             repo = MonitoringRepository(conn)
+
+            def cycle() -> int:
+                if args.refresh_passive:
+                    refresh_selected(repo, settings, args.device_id, enabled=True)
+                if stopped.is_set():
+                    return 0
+                return monitor_once(repo, settings, args.device_id, enabled=True)
+
             result = run_periodic(
-                lambda: monitor_once(repo, settings, args.device_id, enabled=True),
+                cycle,
                 interval_seconds=args.interval_seconds,
                 cycles=count,
                 stop=stopped,
