@@ -57,9 +57,9 @@ def test_invalid_limits_fail_before_temporary_directory(
 def test_existing_tracer_is_not_stopped(monkeypatch: pytest.MonkeyPatch) -> None:
     start = Mock()
     stop = Mock()
-    monkeypatch.setattr(resource_profile.tracemalloc, "is_tracing", lambda: True)
-    monkeypatch.setattr(resource_profile.tracemalloc, "start", start)
-    monkeypatch.setattr(resource_profile.tracemalloc, "stop", stop)
+    monkeypatch.setattr(tracemalloc, "is_tracing", lambda: True)
+    monkeypatch.setattr(tracemalloc, "start", start)
+    monkeypatch.setattr(tracemalloc, "stop", stop)
     with pytest.raises(ConfigError, match="existing"):
         resource_profile.profile_resources(cycles=1, warmup=1)
     start.assert_not_called()
