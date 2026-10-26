@@ -131,7 +131,9 @@ class Settings(_Model):
     scan: ScanSettings = Field(default_factory=ScanSettings)
     monitor: MonitorSettings = Field(default_factory=MonitorSettings)
     retention: RetentionSettings = Field(default_factory=RetentionSettings)
-    discovery_retention: DiscoveryRetentionSettings = Field(default_factory=DiscoveryRetentionSettings)
+    discovery_retention: DiscoveryRetentionSettings = Field(
+        default_factory=DiscoveryRetentionSettings
+    )
     health: HealthSettings = Field(default_factory=HealthSettings)
     alerts: AlertSettings = Field(default_factory=AlertSettings)
     api: ApiSettings = Field(default_factory=ApiSettings)
