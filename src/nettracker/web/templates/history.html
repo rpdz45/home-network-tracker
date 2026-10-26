@@ -1,52 +1,64 @@
-{# Compact sample charts; no interpolation or temporal uptime inference. #}
-{% set samples = sightings[:25]|reverse|selectattr('source', 'equalto', 'ping')|list %}
+{# Temporal ICMP aggregates; empty buckets remain unknown. #}
 <section aria-labelledby="history-title">
-<h2 id="history-title">Historique ICMP — aperçu des observations récentes</h2>
-<p class="note">Mesures ICMP présentes parmi les 25 dernières observations, toutes sources
-confondues. Ordre chronologique, espacement par mesure : ce n’est pas une échelle de temps.</p>
-{% if samples %}
-{% set replies = samples|selectattr('online')|list %}
-{% set latencies = replies|map(attribute='latency_ms')|reject('none')|list %}
-{% set peak = ([1, latencies|max]|max) if latencies else 1 %}
+<h2 id="history-title">Historique ICMP — {{ '24 heures' if series.window == '24h' else '7 jours' }}</h2>
+<form method="get" action="/devices/{{ device['id'] }}">
+<label for="history-window">Période</label>
+<select id="history-window" name="window">
+<option value="24h"{% if series.window == '24h' %} selected{% endif %}>24 heures</option>
+<option value="7d"{% if series.window == '7d' %} selected{% endif %}>7 jours</option>
+</select>
+<button type="submit">Afficher</button>
+</form>
+<p>Du {{ series.start }} au {{ series.end }} (UTC, borne de fin exclue).
+96 créneaux de {{ series.minutes }} minutes, espacés selon le temps et non le nombre de mesures.</p>
 <style>
-.icmp-bars { display: flex; gap: .25rem; height: 10rem; align-items: stretch;
+.history-scroll { overflow-x: auto; }
+.history-plot { display: flex; height: 10rem; min-width: 36rem; gap: 2px;
   border-bottom: 1px solid currentColor; margin-block: 1rem; }
-.icmp-sample { flex: 1; min-width: 0; display: flex; flex-direction: column;
-  justify-content: flex-end; align-items: stretch; }
-.icmp-bar { background: #01696f; min-height: 2px; }
-.icmp-no-latency { text-align: center; font-size: 1rem; }
-.icmp-status { display: flex; flex-wrap: wrap; gap: .25rem; margin-block: 1rem; }
-.icmp-status span { padding: .25rem .5rem; border: 1px solid currentColor; }
+.history-slot { flex: 1; min-width: 0; display: flex; align-items: flex-end;
+  background: #e3e6ec; }
+.history-bar { width: 100%; background: #01696f; }
+.history-mark { width: 100%; text-align: center; font-size: .75rem; }
+.history-axis { display: flex; justify-content: space-between; gap: 1rem; }
 </style>
-<h3>Latence des réponses (ms)</h3>
-<p>Échelle verticale : 0 à {{ peak }} ms. Une croix signifie « aucune latence mesurée »,
-jamais zéro milliseconde.</p>
-<div class="icmp-bars" role="img"
-     aria-label="Latence par mesure ; valeurs et dates dans le tableau des dernières mesures.">
-{% for sample in samples %}
-<div class="icmp-sample" title="{{ sample['seen_at'] }} : {% if sample['online'] and sample['latency_ms'] is not none %}{{ sample['latency_ms'] }} ms{% else %}aucune latence mesurée{% endif %}">
-{% if sample['online'] and sample['latency_ms'] is not none %}
-<div class="icmp-bar" style="height: {{ (sample['latency_ms'] / peak * 100)|round(2) }}%;"></div>
+<h3>Latence moyenne des réponses par créneau (ms)</h3>
+<p>Échelle : 0 à {{ series.scale_ms }} ms. ? : sans mesure ; × : aucune latence de réponse.
+Une barre de hauteur nulle peut représenter une réponse valide de 0 ms.</p>
+<div class="history-scroll">
+<div class="history-plot" role="img" aria-label="Latences moyennes par créneau ; données dans le tableau ci-dessous.">
+{% for bucket in series.buckets %}
+<div class="history-slot" title="{{ bucket.start }} — {{ bucket.end }} : {{ bucket.count }} mesure(s)">
+{% if bucket.mean_ms is not none %}
+<div class="history-bar" style="height: {{ (bucket.mean_ms / series.scale_ms * 100)|round(2) }}%;"></div>
 {% else %}
-<span class="icmp-no-latency">×</span>
+<span class="history-mark">{{ '?' if bucket.count == 0 else '×' }}</span>
 {% endif %}
 </div>
 {% endfor %}
 </div>
-<h3>Réponses aux sondes enregistrées</h3>
-<p>{{ replies|length }} réponse(s) sur {{ samples|length }} mesure(s), soit
-{{ '%.1f'|format(replies|length / samples|length * 100) }} % des mesures affichées.
-Ce pourcentage n’est pas un uptime temporel ni un taux de paquets reçus.</p>
-<div class="icmp-status" aria-label="Résultat de chaque mesure, de la plus ancienne à la plus récente">
-{% for sample in samples %}
-<span title="{{ sample['seen_at'] }}">{{ loop.index }} : {{ 'réponse' if sample['online'] else 'non-réponse' }}</span>
-{% endfor %}
+<div class="history-axis"><span>{{ series.start }}</span><span>{{ series.end }}</span></div>
 </div>
-<p class="note">Disponibilité inconnue entre les observations, avant la première et après
-la dernière. Les points ne sont pas reliés et aucune disponibilité n’est extrapolée.
-Une non-réponse ICMP ne prouve pas qu’un appareil est déconnecté.</p>
+{% if series.ratio is not none %}
+<p>{{ series.replies }} réponse(s) sur {{ series.count }} mesure(s), soit
+{{ '%.1f'|format(series.ratio) }} % des sondes enregistrées dans cette fenêtre.</p>
 {% else %}
-<p>Aucune mesure ICMP dans les observations affichées. Disponibilité inconnue.
-Les observations de découverte ne sont pas comptées comme des sondes ICMP.</p>
+<p>Aucune mesure ICMP dans cette fenêtre. Disponibilité inconnue.</p>
 {% endif %}
+<p class="note">Ce ratio n’est pas un uptime temporel ni un taux de paquets reçus.
+Un créneau vide signifie « sans mesure », jamais « disponible » ou « hors ligne ».
+Même un créneau avec des réponses ne prouve pas une disponibilité continue entre les sondes.
+Aucune courbe ne relie les créneaux ; aucune extrapolation. Une non-réponse ICMP ne prouve pas une déconnexion.</p>
+<details>
+<summary>Données par créneau (UTC)</summary>
+<div class="history-scroll">
+<table>
+<thead><tr><th>Début inclus</th><th>Fin exclue</th><th>Mesures</th><th>Réponses</th><th>État observé</th><th>Moyenne (ms)</th><th>Maximum (ms)</th></tr></thead>
+<tbody>
+{% for bucket in series.buckets %}
+<tr><td>{{ bucket.start }}</td><td>{{ bucket.end }}</td><td>{{ bucket.count }}</td><td>{{ bucket.replies }}</td><td>{{ {'unknown': 'sans mesure', 'no_reply': 'non-réponses seules', 'reply': 'réponses seules', 'mixed': 'mixte'}[bucket.status] }}</td><td>{{ bucket.mean_ms if bucket.mean_ms is not none else '—' }}</td><td>{{ bucket.peak_ms if bucket.peak_ms is not none else '—' }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</details>
 </section>

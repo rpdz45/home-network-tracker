@@ -1,21 +1,29 @@
-# M5 — Aperçu graphique des mesures ICMP
+# M5 — Historique temporel ICMP 24 h / 7 jours
 
-## Périmètre de ce premier lot
+## Utilisation et périmètre
 
-La fiche appareil inclut history.html avant le tableau des mesures. Le composant réutilise les 25 dernières observations déjà chargées, toutes sources confondues, puis sélectionne uniquement source=ping. Aucune requête, migration, route, dépendance ou sonde supplémentaire. Aucun JavaScript, CDN, télémétrie ou assouplissement de la CSP. Les formulaires protégés restent inchangés.
+La fiche /devices/{id} propose maintenant une période 24 heures (défaut) ou 7 jours via le paramètre window=24h ou window=7d. Les autres valeurs sont refusées par la validation FastAPI. Le tableau des dernières observations reste limité à 25 lignes, mais le graphique ne dépend plus de cette limite : toutes les sondes source=ping de la fenêtre sont agrégées par une requête dédiée en lecture seule.
 
-Les barres représentent les latences des réponses, dans l’ordre chronologique des mesures. L’espacement est par observation et non par durée. Les non-réponses affichent une croix : aucune latence mesurée, pas 0 ms. Une réponse valide de 0 ms reste une réponse (barre avec minimum visuel de 2 px). L’échelle verticale a un minimum de 1 ms et s’adapte au maximum affiché. Les valeurs exactes et dates restent dans le tableau existant.
+Le graphique présente exactement 96 créneaux chronologiques de même durée : 15 minutes sur 24 h, 105 minutes sur 7 jours. L’origine de l’axe est le début de la fenêtre, pas le rang d’une mesure. Les données sont exprimées en UTC, avec début inclus et fin exclue. La fin est l’horloge injectée, convertie en UTC et tronquée à la seconde ; les mesures de la seconde en cours ne sont donc pas encore affichées.
 
-Le second graphique indique réponse/non-réponse pour chaque sonde. Le pourcentage est le nombre de mesures avec réponse divisé par le nombre de mesures ICMP affichées : ce n’est ni un uptime temporel ni un taux de paquets reçus. Aucune interpolation entre les mesures. La disponibilité avant, après et entre les observations reste inconnue et est signalée explicitement. Une absence de réponse ICMP ne prouve pas une déconnexion.
+Chaque barre représente la moyenne des latences des réponses dans son créneau. L’échelle verticale utilise le maximum de latence observé, avec un minimum de 1 ms. Le tableau dépliable indique début, fin, nombre de mesures, nombre de réponses, état observé, moyenne et maximum pour les 96 créneaux. Les valeurs nulles ne deviennent jamais des zéros ; une réponse valide à 0 ms reste comptée comme réponse.
 
-## Limites et suite du jalon
+## Lacunes et disponibilité
 
-Ce lot est un aperçu compact, pas une courbe temporelle sur 24 h ou 7 jours. Une activité de découverte importante peut évincer les anciens pings des 25 observations affichées. Aucun calcul sur tout l’historique, aucune pagination, aucune représentation de durée des pannes. Les périodes sans mesure ne sont pas inventées. Le jalon M5 complet reste ouvert : requête historique dédiée, axe temporel, fenêtres sélectionnables et politique explicite des lacunes à traiter dans un lot ultérieur.
+Un créneau sans mesure est explicitement inconnu (?). Un créneau sans latence de réponse affiche ×. Le tableau distingue réponses seules, non-réponses seules, mixte et sans mesure. Même un créneau comportant une réponse ne prouve pas une disponibilité continue entre les sondes. Aucune interpolation ou liaison de courbe entre créneaux.
 
-Le tableau permet de lire les données sans dépendre des infobulles ou de la couleur ; le composant indique son contenu aux technologies d’assistance. Rendu navigateur/mobile et accessibilité pratique non vérifiés.
+Le ratio global est la somme des réponses divisée par la somme des sondes, sans moyenne de pourcentages de créneaux. Ce n’est pas un uptime temporel ni un taux de paquets reçus. Aucune mesure donne un ratio absent, pas 0 % ni 100 %. Une absence de réponse ICMP ne prouve pas une déconnexion. Le calcul d’un uptime temporel reste hors périmètre tant qu’une politique de couverture n’est pas définie.
 
-## Tests et validation
+## Décision technique et sécurité
 
-Sept tests de rendu Jinja ont réussi dans l’environnement de préparation, avec le contenu exact de history.html chargé via DictLoader. Seul le chargeur de fichiers du setUp a été remplacé pour cette exécution ; le chargement depuis les fichiers du dépôt et l’intégration FastAPI seront vérifiés par la CI. Fixtures synthétiques de test uniquement, aucune donnée du foyer : absence de mesures, découverte exclue, ordre chronologique, ratio sur les échantillons, non-réponse, latence nulle, échappement HTML et borne de 25 observations.
+Agrégation SQL dans web/timeseries.py et objets Bucket/TimeSeries immuables ; pas de migration ou nouvelle dépendance. L’index existant sightings(device_id, seen_at) sert au filtrage par appareil et fenêtre. Le résultat chargé en Python est borné à 96 agrégats ; le travail SQL dépend néanmoins du volume de sondes dans les sept jours, sans benchmark de charge réalisé. Les horodatages attendus sont le format canonique UTC avec microsecondes produit par le repository. La conversion en secondes utilise les 19 premiers caractères pour éviter l’arrondi SQLite des fractions proches de la seconde suivante ; le filtrage des bornes conserve les microsecondes.
 
-Syntaxe Python et longueur des lignes du nouveau fichier de test vérifiées. Ruff, mypy, suite complète, audits de sécurité et CI non exécutés pour ce commit. Aucun test réseau ou matériel réel. Commande ciblée : pytest tests/unit/test_history_charts.py tests/unit/test_web.py tests/unit/test_web_edits.py -vv. Fusion uniquement après revue et CI complète verte.
+HTML/CSS serveur uniquement : aucun JavaScript, CDN, scan, télémétrie ou connexion sortante. Authentification, CSRF, query_only et CSP conservés. Les sept anciens tests du composant compact sont remplacés par quinze tests portant sur le composant temporel et sa requête ; l’ancien contrat limité à 25 observations est volontairement supprimé.
+
+## Validation et limites
+
+Quinze tests SQLite/Jinja ont réussi dans l’environnement de préparation avec un schéma SQLite minimal compatible avec les colonnes utilisées et le template exact chargé via DictLoader. Les définitions des exceptions nécessaires ont été recréées en mémoire ; les imports du paquet installé et le chargeur de fichiers réel n’ont pas été validés par cette exécution. Deux attentes initiales de fixtures ont été corrigées : leurs mesures tombaient de part et d’autre d’une frontière de créneau et ne devaient pas être moyennées ensemble. Le test distinct des frontières temporelles reste présent.
+
+Cas vérifiés : fenêtres et durées, 96 créneaux, absence de données, bornes incluses/exclues, microsecondes, découverte et autres appareils exclus, plus de 25 mesures, moyenne/maximum, créneau mixte, ratio pondéré par sondes, non-réponse, latence nulle, fuseaux horaires, paramètres invalides, erreur SQLite et connexion query_only. Syntaxe et longueur des lignes des trois fichiers Python vérifiées. Tests HTTP, migrations réelles, Ruff, mypy, audits, couverture et CI complète restent à exécuter pour ce commit. Aucun test navigateur, mobile, réseau ou matériel réel.
+
+Commande ciblée : pytest tests/unit/test_history_charts.py tests/unit/test_web.py tests/unit/test_web_edits.py -vv. Vérifier ensuite toute la CI avant fusion. Test manuel : choisir les deux périodes, comparer les agrégats au tableau dépliable et vérifier qu’une fenêtre sans sondes reste inconnue. Le README historique et les notes des lots précédents peuvent encore décrire l’ancien aperçu ; cette page décrit le comportement de ce lot temporel.
