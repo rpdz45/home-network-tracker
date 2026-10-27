@@ -74,9 +74,7 @@ def test_external_traversal_and_non_source_names_are_hidden(tmp_path: Path) -> N
 
 
 def test_empty_and_zero_changes_are_omitted(tmp_path: Path) -> None:
-    summary = summarize_allocations(
-        [(str(tmp_path / "empty.py"), 1, 0, 0)], package_root=tmp_path
-    )
+    summary = summarize_allocations([(str(tmp_path / "empty.py"), 1, 0, 0)], package_root=tmp_path)
     assert summary.entries == ()
     assert summary.other_project_size_diff_bytes == 0
     assert summary.external_size_diff_bytes == 0
