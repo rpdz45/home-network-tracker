@@ -24,9 +24,7 @@ def discovery_case(case: Case, monkeypatch: pytest.MonkeyPatch) -> Case:
     for index in range(6):
         moment = NOW - timedelta(days=2, seconds=index)
         scan = repo.start_scan(mode="passive", started_at=moment)
-        repo.add_sighting(
-            device_id=1, scan_id=scan, ip="192.168.1.20", online=True, seen_at=moment
-        )
+        repo.add_sighting(device_id=1, scan_id=scan, ip="192.168.1.20", online=True, seen_at=moment)
         repo.finish_scan(scan, status="ok", finished_at=moment)
     current = repo.start_scan(mode="passive", started_at=NOW)
     repo.finish_scan(current, status="ok", finished_at=NOW)
@@ -37,9 +35,7 @@ def discovery_case(case: Case, monkeypatch: pytest.MonkeyPatch) -> Case:
             repo.finish_scan(problem, status="error", finished_at=moment)
     boundary = NOW - timedelta(days=1)
     scan = repo.start_scan(mode="passive", started_at=boundary)
-    repo.add_sighting(
-        device_id=1, scan_id=scan, ip="192.168.1.20", online=True, seen_at=boundary
-    )
+    repo.add_sighting(device_id=1, scan_id=scan, ip="192.168.1.20", online=True, seen_at=boundary)
     repo.finish_scan(scan, status="ok", finished_at=boundary)
     configured = DiscoveryRetentionSettings(enabled=True, keep_days=1, batch_size=2, max_batches=9)
     case.settings = case.settings.model_copy(update={"discovery_retention": configured})
