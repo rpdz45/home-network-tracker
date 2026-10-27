@@ -70,8 +70,10 @@ def case(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Case]:
                 device_id=device.id, ip=f"192.168.1.{index + 19}", online=True, seen_at=NOW
             )
         for index in range(7):
-            moment = NOW - timedelta(days=2) if index < 5 else NOW - timedelta(days=1)
-            if index == 6:
+            moment = NOW - timedelta(days=1)
+            if index < 5:
+                moment = NOW - timedelta(days=2, seconds=index)
+            elif index == 6:
                 moment = NOW - timedelta(hours=1)
             device_id = 1 if index % 2 == 0 else 2
             conn.execute(
