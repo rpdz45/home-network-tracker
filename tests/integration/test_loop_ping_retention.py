@@ -152,9 +152,7 @@ def test_cadence_single_batch_and_protected_tables(
 ) -> None:
     calls: list[int] = []
 
-    def checked(
-        conn: sqlite3.Connection, cutoff: str, *, batch_size: int, max_batches: int
-    ) -> int:
+    def checked(conn: sqlite3.Connection, cutoff: str, *, batch_size: int, max_batches: int) -> int:
         assert not conn.in_transaction
         assert (batch_size, max_batches) == (2, 1)
         calls.append(case.probes.call_count)
@@ -177,9 +175,7 @@ def test_cadence_single_batch_and_protected_tables(
 
 
 @pytest.mark.parametrize("value", ["0", "1000001"])
-def test_invalid_cadence_fails_before_loading(
-    value: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_invalid_cadence_fails_before_loading(value: str, monkeypatch: pytest.MonkeyPatch) -> None:
     load = Mock(side_effect=AssertionError("must validate first"))
     monkeypatch.setattr("nettracker.config.load_settings", load)
     with pytest.raises(SystemExit) as exc:
