@@ -6,6 +6,7 @@ import sqlite3
 from collections.abc import Callable, Sequence
 from contextlib import closing
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Event
 from types import FrameType
@@ -59,12 +60,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--enable-monitoring", action="store_true")
     parser.add_argument("--refresh-passive", action="store_true")
     parser.add_argument("--interval-seconds", type=int, default=60)
+    parser.add_argument(
+        "--prune-ping",
+        action="store_true",
+        help="delete expired ping samples database-wide in bounded single batches",
+    )
+    parser.add_argument(
+        "--prune-every-cycles", type=int, help="purge cadence (1-1000000; default 100)"
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--cycles", type=int)
     mode.add_argument("--continuous", action="store_true")
     args = parser.parse_args(argv)
     if not args.enable_monitoring:
         parser.error("--enable-monitoring is required")
+    if args.prune_every_cycles is not None:
+        if not args.prune_ping:
+            parser.error("--prune-every-cycles requires --prune-ping")
+        if not 1 <= args.prune_every_cycles <= 1_000_000:
+            parser.error("prune cadence must be between 1 and 1000000 cycles")
+    prune_every = 100 if args.prune_every_cycles is None else args.prune_every_cycles
     count = None if args.continuous else (args.cycles if args.cycles is not None else 1)
     try:
         _limits(args.interval_seconds, count)
@@ -74,6 +89,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     from nettracker.config import load_settings
     from nettracker.db import LATEST_VERSION, connect
     from nettracker.db.monitoring import MonitoringRepository
+    from nettracker.db.retention import cutoff_for, prune_ping_samples
     from nettracker.errors import ConfigError, NetTrackerError
     from nettracker.monitor.refresh import refresh_selected
     from nettracker.monitor.service import monitor_once
@@ -89,6 +105,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         settings = load_settings(args.config, dotenv_path=Path(".env"))
         if not settings.monitor.enabled:
             raise ConfigError("monitor.enabled=true is required")
+        if args.prune_ping and not settings.retention.enabled:
+            raise ConfigError("--prune-ping requires retention.enabled=true")
         if not settings.database_path.is_file():
             raise ConfigError("database missing; run nettracker init-db first")
         with closing(connect(settings.database_path)) as conn:
@@ -97,12 +115,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise ConfigError("database schema is not current; run nettracker init-db")
             repo = MonitoringRepository(conn)
 
+            completed = 0
+            pruned = 0
+
             def cycle() -> int:
+                nonlocal completed, pruned
                 if args.refresh_passive:
                     refresh_selected(repo, settings, args.device_id, enabled=True)
                 if stopped.is_set():
                     return 0
-                return monitor_once(repo, settings, args.device_id, enabled=True)
+                saved = monitor_once(repo, settings, args.device_id, enabled=True)
+                completed += 1
+                if args.prune_ping and completed % prune_every == 0 and not stopped.is_set():
+                    if conn.in_transaction:
+                        raise ConfigError("ping retention cannot run inside an open transaction")
+                    pruned += prune_ping_samples(
+                        conn,
+                        cutoff_for(datetime.now(UTC), settings.retention.keep_days),
+                        batch_size=settings.retention.batch_size,
+                        max_batches=1,
+                    )
+                return saved
 
             result = run_periodic(
                 cycle,
@@ -111,6 +144,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 stop=stopped,
             )
         print(f"cycles={result.cycles} measurements={result.measurements}")
+        if args.prune_ping:
+            print(f"pruned_ping_samples={pruned}")
         return 130 if result.interrupted else 0
     except (NetTrackerError, sqlite3.Error) as exc:
         print(f"monitoring stopped: {type(exc).__name__}")
