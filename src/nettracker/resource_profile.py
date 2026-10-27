@@ -14,6 +14,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter, process_time
 
+from nettracker.allocation_diagnostics import AllocationSummary, summarize_allocations
 from nettracker.config import Settings
 from nettracker.db import connect, migrate
 from nettracker.db.discovery_retention import retain_discovery
@@ -45,6 +46,11 @@ class Window:
     scans: int
     database_bytes: int
     wal_bytes: int
+
+
+@dataclass(frozen=True)
+class AllocationWindow(Window):
+    allocations: AllocationSummary
 
 
 @dataclass(frozen=True)
@@ -100,9 +106,16 @@ def _exercise(conn: sqlite3.Connection, settings: Settings, index: int, cycles: 
 
 
 def _window(
-    conn: sqlite3.Connection, settings: Settings, index: int, cycles: int, path: Path
+    conn: sqlite3.Connection,
+    settings: Settings,
+    index: int,
+    cycles: int,
+    path: Path,
+    *,
+    allocation_details: bool = False,
 ) -> tuple[int, Window]:
     gc.collect()
+    snapshot_before = tracemalloc.take_snapshot() if allocation_details else None
     before = tracemalloc.get_traced_memory()[0]
     tracemalloc.reset_peak()
     wall = perf_counter()
@@ -112,12 +125,13 @@ def _window(
     cpu_elapsed = process_time() - cpu
     wall_elapsed = perf_counter() - wall
     after, peak = tracemalloc.get_traced_memory()
+    snapshot_after = tracemalloc.take_snapshot() if allocation_details else None
     row = conn.execute(
         "SELECT (SELECT COUNT(*) FROM sightings WHERE source='discovery'), "
         "(SELECT COUNT(*) FROM sightings WHERE source='ping'), (SELECT COUNT(*) FROM scans)"
     ).fetchone()
     wal = path.with_name(path.name + "-wal")
-    return index, Window(
+    window = Window(
         cycles=cycles,
         wall_seconds=wall_elapsed,
         cpu_seconds=cpu_elapsed,
@@ -132,9 +146,27 @@ def _window(
         wal_bytes=wal.stat().st_size if wal.is_file() else 0,
     )
 
+    if snapshot_before is not None and snapshot_after is not None:
+        differences = snapshot_after.compare_to(snapshot_before, "lineno")
+        allocations = summarize_allocations(
+            (
+                entry.traceback[0].filename,
+                entry.traceback[0].lineno,
+                entry.size_diff,
+                entry.count_diff,
+            )
+            for entry in differences
+        )
+        window = AllocationWindow(**asdict(window), allocations=allocations)
+    return index, window
 
-def profile_resources(*, cycles: int = 1000, warmup: int = 1500) -> Profile:
+
+def profile_resources(
+    *, cycles: int = 1000, warmup: int = 1500, allocation_details: bool = False
+) -> Profile:
     """Measure two windows; no user configuration, targets or database paths accepted."""
+    if not isinstance(allocation_details, bool):
+        raise ConfigError("allocation_details must be boolean")
     for value in (cycles, warmup):
         if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5000:
             raise ConfigError("cycles and warmup must be integers between 1 and 5000")
@@ -158,7 +190,9 @@ def profile_resources(*, cycles: int = 1000, warmup: int = 1500) -> Profile:
                 index = _exercise(conn, settings, 0, warmup)
                 windows: list[Window] = []
                 for _ in range(2):
-                    index, window = _window(conn, settings, index, cycles, path)
+                    index, window = _window(
+                        conn, settings, index, cycles, path, allocation_details=allocation_details
+                    )
                     windows.append(window)
                 return Profile(warmup, cycles, sys.version.split()[0], sys.platform, tuple(windows))
     finally:
@@ -174,9 +208,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="cycles per measured window (1-5000)",
     )
     parser.add_argument("--warmup", type=int, default=1500, help="warmup cycles (1-5000)")
+    parser.add_argument(
+        "--allocation-details", action="store_true", help="include redacted snapshot differences"
+    )
     args = parser.parse_args(argv)
     try:
-        report = profile_resources(cycles=args.cycles, warmup=args.warmup)
+        report = profile_resources(
+            cycles=args.cycles, warmup=args.warmup, allocation_details=args.allocation_details
+        )
     except KeyboardInterrupt:
         print("profile interrupted", file=sys.stderr)
         return 130
