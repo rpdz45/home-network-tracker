@@ -68,6 +68,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--prune-every-cycles", type=int, help="purge cadence (1-1000000; default 100)"
     )
+    parser.add_argument(
+        "--prune-discovery",
+        action="store_true",
+        help="delete superseded discoveries and unused old scans database-wide",
+    )
+    parser.add_argument(
+        "--discovery-prune-every-cycles", type=int, help="discovery purge cadence (default 100)"
+    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--cycles", type=int)
     mode.add_argument("--continuous", action="store_true")
@@ -80,6 +88,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not 1 <= args.prune_every_cycles <= 1_000_000:
             parser.error("prune cadence must be between 1 and 1000000 cycles")
     prune_every = 100 if args.prune_every_cycles is None else args.prune_every_cycles
+    discovery_every = args.discovery_prune_every_cycles
+    if discovery_every is not None:
+        if not args.prune_discovery:
+            parser.error("--discovery-prune-every-cycles requires --prune-discovery")
+        if not 1 <= discovery_every <= 1_000_000:
+            parser.error("discovery prune cadence must be between 1 and 1000000 cycles")
+    else:
+        discovery_every = 100
     count = None if args.continuous else (args.cycles if args.cycles is not None else 1)
     try:
         _limits(args.interval_seconds, count)
@@ -88,6 +104,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     from nettracker.config import load_settings
     from nettracker.db import LATEST_VERSION, connect
+    from nettracker.db.discovery_retention import retain_discovery
     from nettracker.db.monitoring import MonitoringRepository
     from nettracker.db.retention import cutoff_for, prune_ping_samples
     from nettracker.errors import ConfigError, NetTrackerError
@@ -107,6 +124,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise ConfigError("monitor.enabled=true is required")
         if args.prune_ping and not settings.retention.enabled:
             raise ConfigError("--prune-ping requires retention.enabled=true")
+        if args.prune_discovery and not settings.discovery_retention.enabled:
+            raise ConfigError("--prune-discovery requires discovery_retention.enabled=true")
         if not settings.database_path.is_file():
             raise ConfigError("database missing; run nettracker init-db first")
         with closing(connect(settings.database_path)) as conn:
@@ -117,9 +136,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             completed = 0
             pruned = 0
+            pruned_observations = 0
+            pruned_scans = 0
 
             def cycle() -> int:
-                nonlocal completed, pruned
+                nonlocal completed, pruned, pruned_observations, pruned_scans
                 if args.refresh_passive:
                     refresh_selected(repo, settings, args.device_id, enabled=True)
                 if stopped.is_set():
@@ -135,6 +156,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                         batch_size=settings.retention.batch_size,
                         max_batches=1,
                     )
+                if (
+                    args.prune_discovery
+                    and completed % discovery_every == 0
+                    and not stopped.is_set()
+                ):
+                    discovery = retain_discovery(
+                        conn,
+                        datetime.now(UTC),
+                        keep_days=settings.discovery_retention.keep_days,
+                        batch_size=settings.discovery_retention.batch_size,
+                        max_batches=1,
+                        enabled=True,
+                    )
+                    pruned_observations += discovery.observations
+                    pruned_scans += discovery.scans
                 return saved
 
             result = run_periodic(
@@ -146,6 +182,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"cycles={result.cycles} measurements={result.measurements}")
         if args.prune_ping:
             print(f"pruned_ping_samples={pruned}")
+        if args.prune_discovery:
+            print(
+                f"pruned_discovery_observations={pruned_observations} pruned_scans={pruned_scans}"
+            )
         return 130 if result.interrupted else 0
     except (NetTrackerError, sqlite3.Error) as exc:
         print(f"monitoring stopped: {type(exc).__name__}")
