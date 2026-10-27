@@ -54,6 +54,16 @@ class AllocationWindow(Window):
 
 
 @dataclass(frozen=True)
+class SeriesWindow(Window):
+    python_between_windows_delta_bytes: int | None
+
+
+@dataclass(frozen=True)
+class AllocationSeriesWindow(SeriesWindow):
+    allocations: AllocationSummary
+
+
+@dataclass(frozen=True)
 class Profile:
     warmup_cycles: int
     cycles_per_window: int
@@ -161,15 +171,39 @@ def _window(
     return index, window
 
 
+def _series_window(window: Window, previous_after: int | None) -> SeriesWindow:
+    """Label inter-window changes without claiming an exact profiler-overhead correction."""
+    gap = None if previous_after is None else window.python_before_bytes - previous_after
+    values = asdict(window)
+    values.pop("allocations", None)
+    if isinstance(window, AllocationWindow):
+        return AllocationSeriesWindow(
+            **values,
+            python_between_windows_delta_bytes=gap,
+            allocations=window.allocations,
+        )
+    return SeriesWindow(**values, python_between_windows_delta_bytes=gap)
+
+
 def profile_resources(
-    *, cycles: int = 1000, warmup: int = 1500, allocation_details: bool = False
+    *,
+    cycles: int = 1000,
+    warmup: int = 1500,
+    allocation_details: bool = False,
+    window_count: int = 2,
 ) -> Profile:
-    """Measure two windows; no user configuration, targets or database paths accepted."""
+    """Measure bounded offline windows without user configuration or database paths."""
     if not isinstance(allocation_details, bool):
         raise ConfigError("allocation_details must be boolean")
     for value in (cycles, warmup):
         if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5000:
             raise ConfigError("cycles and warmup must be integers between 1 and 5000")
+    if (
+        isinstance(window_count, bool)
+        or not isinstance(window_count, int)
+        or not 1 <= window_count <= 10
+    ):
+        raise ConfigError("window_count must be an integer between 1 and 10")
     if tracemalloc.is_tracing():
         raise ConfigError("resource profiling refuses to replace an existing tracemalloc session")
     tracemalloc.start()
@@ -189,10 +223,13 @@ def profile_resources(
                 )
                 index = _exercise(conn, settings, 0, warmup)
                 windows: list[Window] = []
-                for _ in range(2):
+                for _ in range(window_count):
                     index, window = _window(
                         conn, settings, index, cycles, path, allocation_details=allocation_details
                     )
+                    if window_count != 2:
+                        previous_after = windows[-1].python_after_bytes if windows else None
+                        window = _series_window(window, previous_after)
                     windows.append(window)
                 return Profile(warmup, cycles, sys.version.split()[0], sys.platform, tuple(windows))
     finally:
@@ -211,10 +248,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--allocation-details", action="store_true", help="include redacted snapshot differences"
     )
+    parser.add_argument(
+        "--windows", type=int, default=2, help="consecutive measured windows (1-10; default 2)"
+    )
     args = parser.parse_args(argv)
     try:
         report = profile_resources(
-            cycles=args.cycles, warmup=args.warmup, allocation_details=args.allocation_details
+            cycles=args.cycles,
+            warmup=args.warmup,
+            allocation_details=args.allocation_details,
+            window_count=args.windows,
         )
     except KeyboardInterrupt:
         print("profile interrupted", file=sys.stderr)
