@@ -1,22 +1,27 @@
 {% extends "base.html" %}
+{% from "presentation.html" import local_time %}
 {% block title %}Événements · Home Network Tracker{% endblock %}
 {% block content %}
+<p class="eyebrow">JOURNAL LOCAL</p>
 <h1>Événements récents</h1>
+<p class="lede">Horaires affichés à l'heure de Paris. Les codes techniques restent disponibles pour le diagnostic.</p>
+<div class="panel table-scroll" role="region" aria-label="Événements récents" tabindex="0">
 <table>
-<thead><tr><th>Date</th><th>Type</th><th>Appareil</th><th>Alertes</th><th>Détails</th></tr></thead>
+<thead><tr><th scope="col">Date · Paris</th><th scope="col">Événement</th><th scope="col">Appareil</th><th scope="col">Notifications</th><th scope="col">Détails techniques</th></tr></thead>
 <tbody>
 {% for e in events %}
 <tr>
-<td>{{ e['created_at'] }}</td>
-<td>{{ e['kind'] }}</td>
-<td>{% if e['device_id'] %}<a href="/devices/{{ e['device_id'] }}">{{ e['alias'] or e['hostname'] or e['mac'] }}</a>{% else %}—{% endif %}</td>
-<td>{{ e['statuses'] or '—' }}</td>
-<td><code>{{ e['details'] or '' }}</code></td>
+<td>{{ local_time(e['created_at']) }}</td>
+<td>{{ 'Nouvel appareil' if e['kind'] == 'new_device' else 'Événement réseau' }}<code class="secondary note">{{ e['kind'] }}</code></td>
+<td>{% if e['device_id'] %}<a href="/devices/{{ e['device_id'] }}">{{ e['alias'] or e['hostname'] or ('Appareil n°' ~ e['device_id']) }}</a>{% else %}Sans appareil associé{% endif %}</td>
+<td>{{ 'Simulation — aucun envoi' if e['statuses'] == 'dry_run' else 'Aucune notification enregistrée' if not e['statuses'] else 'Statuts techniques ci-dessous' }}{% if e['statuses'] %}<code class="secondary note">{{ e['statuses'] }}</code>{% endif %}</td>
+<td><code>{{ e['details'] or 'Aucun détail' }}</code></td>
 </tr>
 {% else %}
-<tr><td colspan="5">Aucun événement.</td></tr>
+<tr><td class="empty" colspan="5">Aucun événement.</td></tr>
 {% endfor %}
 </tbody>
 </table>
-<p class="note">Les alertes sont des enregistrements locaux : <code>dry_run</code> signifie que rien n'a été envoyé.</p>
+</div>
+<p class="note">Les notifications sont des enregistrements locaux : <code>dry_run</code> signifie que rien n'a été envoyé.</p>
 {% endblock %}

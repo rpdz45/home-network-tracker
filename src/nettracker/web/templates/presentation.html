@@ -1,0 +1,4 @@
+{# Display local time while preserving the source instant for DST ambiguity. #}
+{% macro local_time(value) -%}
+<time title="Horodatage source : {{ value or 'absent' }}">{{ value|paris_datetime }}</time>
+{%- endmacro %}

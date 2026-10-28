@@ -8,6 +8,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from nettracker.errors import DatabaseError
+from nettracker.web.formatting import paris_datetime
 from nettracker.web.timeseries import load_series
 
 NOW = datetime(2026, 10, 25, 18, tzinfo=UTC)
@@ -24,6 +25,7 @@ class TimeSeriesTests(unittest.TestCase):
         self.env = Environment(
             loader=FileSystemLoader(templates), autoescape=select_autoescape(["html"])
         )
+        self.env.filters["paris_datetime"] = paris_datetime
 
     def tearDown(self) -> None:
         self.conn.close()
@@ -152,3 +154,110 @@ class TimeSeriesTests(unittest.TestCase):
         self.assertIn('value="7d" selected', text)
         self.assertIn("sans mesure", text)
         self.assertIn("pas un uptime temporel", text)
+
+    def render_device(
+        self,
+        source: str = "discovery",
+        online: bool | None = True,
+        can_edit: bool = False,
+        alias: str = "",
+    ) -> str:
+        stamp = NOW.isoformat()
+        return self.env.get_template("device.html").render(
+            device={
+                "id": 1,
+                "alias": alias,
+                "hostname": None,
+                "device_type": "phone",
+                "vendor": None,
+                "mac": "00:11:22:33:44:55",
+                "status": "unknown",
+                "is_randomized_mac": False,
+                "first_seen": stamp,
+                "last_seen": stamp,
+                "merged_into": None,
+            },
+            sightings=[
+                {
+                    "source": source,
+                    "online": online,
+                    "ip": "192.168.1.20",
+                    "latency_ms": None,
+                    "packet_loss_pct": None,
+                    "seen_at": stamp,
+                }
+            ],
+            events=[
+                {
+                    "created_at": stamp,
+                    "kind": "new_device",
+                    "statuses": "dry_run",
+                    "details": "<b>fixture</b>",
+                }
+            ],
+            can_edit=can_edit,
+            csrf="fixture-csrf",
+            device_types=["phone"],
+            series=load_series(self.conn, 1, NOW),
+        )
+
+    def test_detail_displays_french_identity_and_dates(self) -> None:
+        text = self.render_device()
+        self.assertIn("Appareil n°1", text)
+        self.assertIn("Téléphone", text)
+        self.assertIn("À valider", text)
+        self.assertIn(">19:00 · 25/10/2026</time>", text)
+        self.assertIn("Non disponible à ce stade", text)
+
+    def test_detail_distinguishes_discovery_from_ping(self) -> None:
+        text = self.render_device()
+        self.assertIn("Observation du cache", text)
+        self.assertIn("Présence non vérifiée", text)
+        self.assertNotIn("Réponse ICMP reçue", text)
+
+    def test_detail_ping_no_reply_is_not_a_disconnect_claim(self) -> None:
+        text = self.render_device(source="ping", online=False)
+        self.assertIn("Sans réponse ICMP", text)
+        self.assertNotIn("Déconnecté", text)
+
+    def test_detail_escapes_identity_and_event_details(self) -> None:
+        text = self.render_device(alias="<script>alert(1)</script>")
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", text)
+        self.assertNotIn("<script>", text)
+        self.assertIn("&lt;b&gt;fixture&lt;/b&gt;", text)
+
+    def test_detail_preserves_edit_fields_and_readonly_notice(self) -> None:
+        text = self.render_device(can_edit=True)
+        self.assertIn('name="csrf" value="fixture-csrf"', text)
+        self.assertIn('action="/devices/1/edit"', text)
+        self.assertIn('name="mark_known" value="yes"', text)
+        self.assertIn("Configure un jeton API", self.render_device())
+
+    def test_events_display_local_dates_and_keep_diagnostic_codes(self) -> None:
+        text = self.env.get_template("events.html").render(
+            events=[
+                {
+                    "created_at": NOW.isoformat(),
+                    "kind": "new_device",
+                    "device_id": 1,
+                    "alias": None,
+                    "hostname": None,
+                    "mac": "00:11:22:33:44:55",
+                    "statuses": "dry_run",
+                    "details": "<b>fixture</b>",
+                }
+            ]
+        )
+        self.assertIn(">19:00 · 25/10/2026</time>", text)
+        self.assertIn("Appareil n°1", text)
+        self.assertIn("new_device", text)
+        self.assertIn("dry_run", text)
+        self.assertIn("Simulation — aucun envoi", text)
+        self.assertIn("&lt;b&gt;fixture&lt;/b&gt;", text)
+
+    def test_history_displays_paris_across_dst_and_keeps_source_instants(self) -> None:
+        text = self.render()
+        self.assertIn("20:00 · 24/10/2026", text)
+        self.assertIn("19:00 · 25/10/2026", text)
+        self.assertIn("sources UTC", text)
+        self.assertIn("2026-10-25T18:00:00.000000+00:00", text)
