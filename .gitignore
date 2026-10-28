@@ -36,3 +36,6 @@ coverage.xml
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local IEEE registry (installed separately)
+data/oui/*.csv

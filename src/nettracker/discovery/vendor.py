@@ -1,29 +1,9 @@
 """Offline lookup of MAC vendors from the public IEEE MA-L CSV registry."""
 
-import csv
 from collections.abc import Mapping
-from io import StringIO
 
 from nettracker.db.repository import is_locally_administered, normalize_mac
-
-
-def parse_ma_l_csv(text: str) -> dict[str, str]:
-    """Read IEEE's Registry,Assignment,Organization Name CSV fields."""
-    reader = csv.DictReader(StringIO(text))
-    required = {"Registry", "Assignment", "Organization Name"}
-    if reader.fieldnames is None or not required.issubset(reader.fieldnames):
-        raise ValueError("invalid IEEE MA-L CSV header")
-    vendors: dict[str, str] = {}
-    for row in reader:
-        if row["Registry"] != "MA-L":
-            continue
-        prefix = (row["Assignment"] or "").upper()
-        name = (row["Organization Name"] or "").strip()
-        if len(prefix) != 6 or any(char not in "0123456789ABCDEF" for char in prefix):
-            continue
-        if name and name.casefold() != "private":
-            vendors[prefix] = name
-    return vendors
+from nettracker.discovery.oui_registry import parse_ma_l_csv as parse_ma_l_csv
 
 
 def lookup_vendor(mac: str, vendors: Mapping[str, str]) -> str | None:

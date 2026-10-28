@@ -7,6 +7,7 @@ from typing import Literal
 
 from nettracker.db.repository import Repository, normalize_mac
 from nettracker.discovery.known import normalize_known_devices
+from nettracker.discovery.oui_registry import load_local_registry
 from nettracker.discovery.passive import Neighbor, read_neighbors
 from nettracker.discovery.scope import require_allowed_target
 from nettracker.discovery.suggestions import record_merge_suggestions
@@ -35,6 +36,7 @@ def collect_observations(
     if mode not in ("passive", "active"):
         raise ValueError("unsupported discovery mode")
     known_macs = normalize_known_devices(known_devices)
+    resolved_vendors = vendors if vendors is not None else load_local_registry()
     scan_id = repo.start_scan(mode=mode, started_at=clock())
     try:
         neighbors = reader(allowed_subnets)
@@ -50,7 +52,11 @@ def collect_observations(
                 seen.add(key)
                 device = repo.get_device_by_mac(neighbor.mac)
                 new = device is None
-                vendor = lookup_vendor(neighbor.mac, vendors) if vendors is not None else None
+                vendor = (
+                    lookup_vendor(neighbor.mac, resolved_vendors)
+                    if resolved_vendors is not None
+                    else None
+                )
                 hostname = hostname_lookup(neighbor.ip) if hostname_lookup is not None else None
                 device = repo.upsert_device(
                     neighbor.mac, seen_at=clock(), hostname=hostname, vendor=vendor
