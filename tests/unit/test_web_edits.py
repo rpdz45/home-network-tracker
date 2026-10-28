@@ -54,7 +54,16 @@ def test_edit_persists_and_can_mark_known(tmp_path: Path) -> None:
     assert response.headers["location"] == "/devices/1"
     page = client.get("/devices/1").text
     assert "Fixture NAS" in page
-    assert "known" in page
+    assert "Reconnu" in page
+    conn = connect(tmp_path / "edit.db")
+    try:
+        row = conn.execute(
+            "SELECT status, alias, device_type FROM devices WHERE id = ?", (1,)
+        ).fetchone()
+        assert row is not None
+        assert tuple(row) == ("known", "Fixture NAS", "nas")
+    finally:
+        conn.close()
 
 
 def test_no_token_keeps_dashboard_readonly(tmp_path: Path) -> None:
