@@ -1,4 +1,5 @@
 {# Temporal ICMP aggregates; empty buckets remain unknown. #}
+{% from "presentation.html" import local_time %}
 <section aria-labelledby="history-title">
 <h2 id="history-title">Historique ICMP — {{ '24 heures' if series.window == '24h' else '7 jours' }}</h2>
 <form method="get" action="/devices/{{ device['id'] }}">
@@ -9,8 +10,9 @@
 </select>
 <button type="submit">Afficher</button>
 </form>
-<p>Du {{ series.start }} au {{ series.end }} (UTC, borne de fin exclue).
+<p>Du {{ local_time(series.start) }} au {{ local_time(series.end) }} (heure de Paris, borne de fin exclue).
 96 créneaux de {{ series.minutes }} minutes, espacés selon le temps et non le nombre de mesures.</p>
+<p class="note">Les calculs restent en UTC. Lors d'un changement d'heure, deux heures locales peuvent se répéter ; leur horodatage source est disponible au survol des dates.</p>
 <style>
 .history-scroll { overflow-x: auto; }
 .history-plot { display: flex; height: 10rem; min-width: 36rem; gap: 2px;
@@ -27,7 +29,7 @@ Une barre de hauteur nulle peut représenter une réponse valide de 0 ms.</p>
 <div class="history-scroll">
 <div class="history-plot" role="img" aria-label="Latences moyennes par créneau ; données dans le tableau ci-dessous.">
 {% for bucket in series.buckets %}
-<div class="history-slot" title="{{ bucket.start }} — {{ bucket.end }} : {{ bucket.count }} mesure(s)">
+<div class="history-slot" title="{{ bucket.start|paris_datetime }} — {{ bucket.end|paris_datetime }} (Paris) ; sources UTC : {{ bucket.start }} — {{ bucket.end }} : {{ bucket.count }} mesure(s)">
 {% if bucket.mean_ms is not none %}
 <div class="history-bar" style="height: {{ (bucket.mean_ms / series.scale_ms * 100)|round(2) }}%;"></div>
 {% else %}
@@ -36,26 +38,27 @@ Une barre de hauteur nulle peut représenter une réponse valide de 0 ms.</p>
 </div>
 {% endfor %}
 </div>
-<div class="history-axis"><span>{{ series.start }}</span><span>{{ series.end }}</span></div>
+<div class="history-axis"><span>{{ local_time(series.start) }}</span><span>{{ local_time(series.end) }}</span></div>
 </div>
 {% if series.ratio is not none %}
 <p>{{ series.replies }} réponse(s) sur {{ series.count }} mesure(s), soit
 {{ '%.1f'|format(series.ratio) }} % des sondes enregistrées dans cette fenêtre.</p>
 {% else %}
 <p>Aucune mesure ICMP dans cette fenêtre. Disponibilité inconnue.</p>
+<p class="note">Une découverte passive ne remplit pas ce graphique. Des mesures ICMP doivent être explicitement activées et enregistrées ; ouvrir cette fiche ne lance aucun ping.</p>
 {% endif %}
 <p class="note">Ce ratio n’est pas un uptime temporel ni un taux de paquets reçus.
 Un créneau vide signifie « sans mesure », jamais « disponible » ou « hors ligne ».
 Même un créneau avec des réponses ne prouve pas une disponibilité continue entre les sondes.
 Aucune courbe ne relie les créneaux ; aucune extrapolation. Une non-réponse ICMP ne prouve pas une déconnexion.</p>
 <details>
-<summary>Données par créneau (UTC)</summary>
+<summary>Données par créneau (heure de Paris)</summary>
 <div class="history-scroll">
 <table>
 <thead><tr><th>Début inclus</th><th>Fin exclue</th><th>Mesures</th><th>Réponses</th><th>État observé</th><th>Moyenne (ms)</th><th>Maximum (ms)</th></tr></thead>
 <tbody>
 {% for bucket in series.buckets %}
-<tr><td>{{ bucket.start }}</td><td>{{ bucket.end }}</td><td>{{ bucket.count }}</td><td>{{ bucket.replies }}</td><td>{{ {'unknown': 'sans mesure', 'no_reply': 'non-réponses seules', 'reply': 'réponses seules', 'mixed': 'mixte'}[bucket.status] }}</td><td>{{ bucket.mean_ms if bucket.mean_ms is not none else '—' }}</td><td>{{ bucket.peak_ms if bucket.peak_ms is not none else '—' }}</td></tr>
+<tr><td>{{ local_time(bucket.start) }}</td><td>{{ local_time(bucket.end) }}</td><td>{{ bucket.count }}</td><td>{{ bucket.replies }}</td><td>{{ {'unknown': 'sans mesure', 'no_reply': 'non-réponses seules', 'reply': 'réponses seules', 'mixed': 'mixte'}[bucket.status] }}</td><td>{{ bucket.mean_ms if bucket.mean_ms is not none else '—' }}</td><td>{{ bucket.peak_ms if bucket.peak_ms is not none else '—' }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

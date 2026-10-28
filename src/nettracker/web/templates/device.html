@@ -1,17 +1,26 @@
 {% extends "base.html" %}
+{% from "presentation.html" import local_time %}
 {% block title %}Appareil · Home Network Tracker{% endblock %}
 {% block content %}
-<h1>{{ device['alias'] or device['hostname'] or device['mac'] }}</h1>
+{% set types = {'computer': 'Ordinateur', 'phone': 'Téléphone', 'network': 'Équipement réseau', 'iot': 'Objet connecté', 'tv': 'Télévision', 'nas': 'NAS', 'camera': 'Caméra', 'other': 'Autre'} %}
+{% set statuses = {'known': 'Reconnu', 'unknown': 'À valider', 'to_confirm': 'À confirmer', 'ignored': 'Ignoré'} %}
+<p><a href="/">← Tous les appareils</a></p>
+<p class="eyebrow">FICHE APPAREIL</p>
+<h1>{{ device['alias'] or device['hostname'] or ('Appareil n°' ~ device['id']) }}</h1>
+<p class="lede">Identité, observations et historique enregistrés localement. Horaires affichés à l'heure de Paris.</p>
+<h2>Identité et repères</h2>
 <dl>
-<dt>Adresse MAC</dt><dd><code>{{ device['mac'] }}</code>{% if device['is_randomized_mac'] %} <span class="note">(MAC privée ou aléatoire)</span>{% endif %}</dd>
-<dt>Nom d'hôte</dt><dd>{{ device['hostname'] or '—' }}</dd>
-<dt>Alias</dt><dd>{{ device['alias'] or '—' }}</dd>
-<dt>Type</dt><dd>{{ device['device_type'] or '—' }}</dd>
-<dt>Fabricant</dt><dd>{{ device['vendor'] or '—' }}</dd>
-<dt>Statut</dt><dd><span class="badge">{{ device['status'] }}</span></dd>
-<dt>Première observation</dt><dd>{{ device['first_seen'] }}</dd>
-<dt>Dernière observation</dt><dd>{{ device['last_seen'] }}</dd>
+<dt>Nom personnalisé</dt><dd>{{ device['alias'] or 'Non renseigné' }}</dd>
+<dt>Nom réseau</dt><dd>{{ device['hostname'] or 'Non renseigné' }}</dd>
+<dt>Type</dt><dd>{{ types.get(device['device_type'], 'Non renseigné') }}</dd>
+<dt>Fabricant réseau</dt><dd>{{ device['vendor'] or 'Non renseigné' }}</dd>
+<dt>Modèle</dt><dd>Non disponible à ce stade</dd>
+<dt>Adresse MAC</dt><dd><code>{{ device['mac'] }}</code>{% if device['is_randomized_mac'] %} <span class="note">(MAC privée / locale)</span>{% endif %}</dd>
+<dt>Validation personnelle</dt><dd><span class="badge">{{ statuses.get(device['status'], 'Non classé') }}</span></dd>
+<dt>Première observation</dt><dd>{{ local_time(device['first_seen']) }}</dd>
+<dt>Dernière observation</dt><dd>{{ local_time(device['last_seen']) }}</dd>
 </dl>
+<p class="note">Le fabricant réseau ne garantit ni la marque commerciale ni le modèle. Une validation personnelle n'est pas une authentification. Une observation ne prouve pas une présence actuelle.</p>
 {% if can_edit %}
 <section aria-labelledby="edit-title">
 <h2 id="edit-title">Modifier cet appareil</h2>
@@ -23,7 +32,7 @@
 <select id="device-type" name="device_type">
 <option value="">Non renseigné</option>
 {% for kind in device_types %}
-<option value="{{ kind }}"{% if device['device_type'] == kind %} selected{% endif %}>{{ {'computer': 'Ordinateur', 'phone': 'Téléphone', 'network': 'Équipement réseau', 'iot': 'Objet connecté', 'tv': 'Télévision', 'nas': 'NAS', 'camera': 'Caméra', 'other': 'Autre'}[kind] }}</option>
+<option value="{{ kind }}"{% if device['device_type'] == kind %} selected{% endif %}>{{ types.get(kind, 'Autre') }}</option>
 {% endfor %}
 </select></p>
 {% if device['status'] not in ['known', 'ignored'] %}
@@ -37,27 +46,39 @@
 <p class="note">Configure un jeton API pour activer les modifications, même en local.</p>
 {% endif %}
 {% include "history.html" %}
-<h2>Dernières mesures</h2>
+<h2>Dernières observations et mesures</h2>
+<p class="note">Les 25 enregistrements les plus récents sont affichés ici. Une découverte issue du cache n'est pas un test de joignabilité.</p>
+<div class="panel table-scroll" role="region" aria-label="Observations et mesures" tabindex="0">
 <table>
-<thead><tr><th>Source</th><th>IP</th><th>En ligne</th><th>Latence (ms)</th><th>Perte (%)</th><th>Date</th></tr></thead>
+<thead><tr><th scope="col">Source</th><th scope="col">IP</th><th scope="col">Résultat</th><th scope="col">Latence (ms)</th><th scope="col">Perte (%)</th><th scope="col">Date · Paris</th></tr></thead>
 <tbody>
 {% for s in sightings %}
-<tr><td>{{ s['source'] }}</td><td>{{ s['ip'] }}</td><td>{{ 'oui' if s['online'] else 'non' }}</td><td>{{ s['latency_ms'] if s['latency_ms'] is not none else '—' }}</td><td>{{ s['packet_loss_pct'] if s['packet_loss_pct'] is not none else '—' }}</td><td>{{ s['seen_at'] }}</td></tr>
+<tr>
+<td>{{ 'Test ICMP' if s['source'] == 'ping' else 'Observation du cache' if s['source'] == 'discovery' else 'Autre observation' }}</td>
+<td>{{ s['ip'] or 'Non renseignée' }}</td>
+<td>{% if s['source'] != 'ping' %}Présence non vérifiée{% elif s['online'] is none %}Résultat indisponible{% elif s['online'] %}Réponse ICMP reçue{% else %}Sans réponse ICMP{% endif %}</td>
+<td>{{ s['latency_ms'] if s['source'] == 'ping' and s['online'] and s['latency_ms'] is not none else 'Non mesurée' }}</td>
+<td>{{ s['packet_loss_pct'] if s['source'] == 'ping' and s['packet_loss_pct'] is not none else 'Non mesurée' }}</td>
+<td>{{ local_time(s['seen_at']) }}</td>
+</tr>
 {% else %}
-<tr><td colspan="6">Aucune mesure.</td></tr>
+<tr><td class="empty" colspan="6">Aucune observation ni mesure enregistrée pour cet appareil.</td></tr>
 {% endfor %}
 </tbody>
 </table>
-<h2>Événements</h2>
+</div>
+<h2>Événements de cet appareil</h2>
+<div class="panel table-scroll" role="region" aria-label="Événements de cet appareil" tabindex="0">
 <table>
-<thead><tr><th>Date</th><th>Type</th><th>Alertes</th><th>Détails</th></tr></thead>
+<thead><tr><th scope="col">Date · Paris</th><th scope="col">Événement</th><th scope="col">Notifications</th><th scope="col">Détails techniques</th></tr></thead>
 <tbody>
 {% for e in events %}
-<tr><td>{{ e['created_at'] }}</td><td>{{ e['kind'] }}</td><td>{{ e['statuses'] or '—' }}</td><td><code>{{ e['details'] or '' }}</code></td></tr>
+<tr><td>{{ local_time(e['created_at']) }}</td><td>{{ 'Nouvel appareil' if e['kind'] == 'new_device' else 'Événement réseau' }}<code class="secondary note">{{ e['kind'] }}</code></td><td>{{ 'Simulation — aucun envoi' if e['statuses'] == 'dry_run' else 'Aucune notification enregistrée' if not e['statuses'] else 'Statuts techniques ci-dessous' }}{% if e['statuses'] %}<code class="secondary note">{{ e['statuses'] }}</code>{% endif %}</td><td><code>{{ e['details'] or 'Aucun détail' }}</code></td></tr>
 {% else %}
-<tr><td colspan="4">Aucun événement.</td></tr>
+<tr><td class="empty" colspan="4">Aucun événement enregistré pour cet appareil.</td></tr>
 {% endfor %}
 </tbody>
 </table>
+</div>
 <p><a href="/">← Retour aux appareils</a></p>
 {% endblock %}
