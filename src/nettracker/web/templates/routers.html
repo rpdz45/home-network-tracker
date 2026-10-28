@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Routeurs · Home Network Tracker{% endblock %}
+{% block content %}
+<p class="eyebrow">DIAGNOSTIC LOCAL</p>
+<h1>Routeurs</h1>
+<p class="lede">Lire les possibilités d'accès, sans modifier les réglages de votre box.</p>
+<h2>Bbox — cible WiFi 7 XT</h2>
+<p>Compatibilité matérielle non confirmée. Blocage et déblocage indisponibles dans ce lot.</p>
+{% if not enabled %}<p class="badge warn">Diagnostic désactivé par défaut</p>{% endif %}
+{% if invalid_address %}<p role="alert">Adresse Bbox invalide ou hors du périmètre autorisé.</p>{% endif %}
+{% if not address %}<p>Adresse Bbox non configurée ou invalide côté serveur.</p>{% else %}
+<p>Cible configurée : <code>{{ address }}</code></p>{% endif %}
+{% if not has_token %}<p>Configurer un jeton de connexion au dashboard pour autoriser le diagnostic.</p>{% endif %}
+{% if allow_http %}<p class="badge warn">HTTP local autorisé côté serveur : échanges non chiffrés.</p>{% endif %}
+{% if can_run %}
+<form method="post" action="/routers/bbox/diagnose">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<p><label><input type="checkbox" name="confirm" value="yes" required> J'autorise une lecture réseau vers cette cible, sans modifier ses réglages.</label></p>
+<button type="submit">Lancer le diagnostic Bbox</button>
+</form>
+<p class="note">Au maximum trois lectures, sans mot de passe. Attendre 10 secondes entre deux diagnostics.</p>
+{% endif %}
+{% if error %}<p role="alert" class="badge bad">Diagnostic impossible. Vérifiez la cible autorisée, sa disponibilité et la confiance TLS. Aucun résultat de blocage n'est confirmé.</p>{% endif %}
+{% if rows %}
+<div class="panel table-scroll"><table>
+<caption>Résultats des points de lecture effectivement interrogés</caption>
+<thead><tr><th scope="col">Point de lecture</th><th scope="col">Résultat</th></tr></thead>
+<tbody>{% for row in rows %}<tr><td><code>{{ row.path }}</code></td><td>{{ row.label }}</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="note">Un accès refusé n'est pas une absence de règles. Un point accessible ne prouve pas qu'un appareil peut être bloqué.</p>
+{% endif %}
+<h2>Livebox 5</h2>
+<p>Le module de lecture existe mais n'est pas raccordé à cette page. Aucun mot de passe Livebox n'est demandé ici.</p>
+<p class="note">Aucune lecture au simple affichage de cette page. Aucun rafraîchissement automatique, blocage ou modification de la box.</p>
+{% endblock %}

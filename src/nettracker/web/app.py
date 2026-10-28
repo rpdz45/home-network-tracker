@@ -1,4 +1,4 @@
-"""Local dashboard with authenticated device edits. It never scans the network."""
+"""Local dashboard with explicit device edits and router diagnostics."""
 
 import hmac
 import logging
@@ -23,6 +23,7 @@ from nettracker.db.health import CollectorHealth, collector_health
 from nettracker.errors import NetTrackerError
 from nettracker.web import queries
 from nettracker.web.formatting import paris_datetime
+from nettracker.web.router_dashboard import install_router_dashboard
 from nettracker.web.timeseries import load_series
 
 logger = logging.getLogger(__name__)
@@ -244,5 +245,6 @@ def create_app(
             events = queries.recent_events(conn)
         return templates.TemplateResponse(request, "events.html", {"events": events})
 
+    install_router_dashboard(protected, settings, templates)
     app.include_router(protected)
     return app
