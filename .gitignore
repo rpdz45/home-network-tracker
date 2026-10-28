@@ -39,3 +39,4 @@ Thumbs.db
 
 # Local IEEE registry (installed separately)
 data/oui/*.csv
+.oui-*.tmp
