@@ -38,43 +38,45 @@ def download_registry(
     """Fetch only the fixed source; tests inject a transport instead of opening sockets."""
     deadline = clock() + TRANSFER_BUDGET_SECONDS
     try:
-        with httpx.Client(
-            transport=transport,
-            timeout=NETWORK_TIMEOUT,
-            follow_redirects=False,
-            trust_env=False,
-            verify=True,
-            headers={"Accept": "text/csv", "Accept-Encoding": "identity"},
-        ) as client:
-            with client.stream("GET", SOURCE_URL, timeout=NETWORK_TIMEOUT) as response:
+        with (
+            httpx.Client(
+                transport=transport,
+                timeout=NETWORK_TIMEOUT,
+                follow_redirects=False,
+                trust_env=False,
+                verify=True,
+                headers={"Accept": "text/csv", "Accept-Encoding": "identity"},
+            ) as client,
+            client.stream("GET", SOURCE_URL, timeout=NETWORK_TIMEOUT) as response,
+        ):
+            if clock() > deadline:
+                raise RegistryUpdateError("IEEE transfer time budget exceeded")
+            if response.status_code != 200:
+                raise RegistryUpdateError(f"IEEE server returned HTTP {response.status_code}")
+            encoding = response.headers.get("content-encoding", "").strip().lower()
+            if encoding not in ("", "identity"):
+                raise RegistryUpdateError("compressed IEEE responses are refused")
+            declared: int | None = None
+            length = response.headers.get("content-length")
+            if length is not None:
+                try:
+                    declared = int(length)
+                except ValueError as exc:
+                    raise RegistryUpdateError("invalid IEEE content length") from exc
+                if not 0 <= declared <= MAX_REGISTRY_BYTES:
+                    raise RegistryUpdateError("IEEE registry exceeds size limit")
+            data = bytearray()
+            for chunk in response.iter_bytes():
                 if clock() > deadline:
                     raise RegistryUpdateError("IEEE transfer time budget exceeded")
-                if response.status_code != 200:
-                    raise RegistryUpdateError(f"IEEE server returned HTTP {response.status_code}")
-                encoding = response.headers.get("content-encoding", "").strip().lower()
-                if encoding not in ("", "identity"):
-                    raise RegistryUpdateError("compressed IEEE responses are refused")
-                declared: int | None = None
-                length = response.headers.get("content-length")
-                if length is not None:
-                    try:
-                        declared = int(length)
-                    except ValueError as exc:
-                        raise RegistryUpdateError("invalid IEEE content length") from exc
-                    if not 0 <= declared <= MAX_REGISTRY_BYTES:
-                        raise RegistryUpdateError("IEEE registry exceeds size limit")
-                data = bytearray()
-                for chunk in response.iter_bytes():
-                    if clock() > deadline:
-                        raise RegistryUpdateError("IEEE transfer time budget exceeded")
-                    if len(data) + len(chunk) > MAX_REGISTRY_BYTES:
-                        raise RegistryUpdateError("IEEE registry exceeds size limit")
-                    data.extend(chunk)
-                if clock() > deadline:
-                    raise RegistryUpdateError("IEEE transfer time budget exceeded")
-                if declared is not None and len(data) != declared:
-                    raise RegistryUpdateError("incomplete IEEE response")
-                return bytes(data)
+                if len(data) + len(chunk) > MAX_REGISTRY_BYTES:
+                    raise RegistryUpdateError("IEEE registry exceeds size limit")
+                data.extend(chunk)
+            if clock() > deadline:
+                raise RegistryUpdateError("IEEE transfer time budget exceeded")
+            if declared is not None and len(data) != declared:
+                raise RegistryUpdateError("incomplete IEEE response")
+            return bytes(data)
     except httpx.HTTPError as exc:
         raise RegistryUpdateError("IEEE HTTPS request failed") from exc
 

@@ -140,7 +140,7 @@ def test_oversized_install_preserves_previous_file(
 def test_non_csv_destination_is_refused(tmp_path: Path) -> None:
     destination = tmp_path / "database.db"
     destination.write_bytes(b"unchanged")
-    with pytest.raises(updater.RegistryUpdateError, match=".csv"):
+    with pytest.raises(updater.RegistryUpdateError, match=r"\.csv"):
         updater.install_registry(CSV, destination)
     assert destination.read_bytes() == b"unchanged"
 
