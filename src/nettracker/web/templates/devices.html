@@ -1,26 +1,40 @@
 {% extends "base.html" %}
 {% block title %}Appareils · Home Network Tracker{% endblock %}
 {% block content %}
-<h1>Appareils</h1>
-<p><span class="badge {{ health_class }}">Collecteur : {{ health_label }}</span>
-{% if health.last_success_at %}<span class="note"> dernier scan réussi : {{ health.last_success_at }}</span>{% endif %}</p>
+{% set labels = {'known': 'Reconnu', 'unknown': 'À valider', 'to_confirm': 'À confirmer', 'ignored': 'Ignoré'} %}
+<p class="eyebrow">TABLEAU DE BORD LOCAL</p>
+<h1>Mes appareils</h1>
+<p class="lede">Des identités lisibles et les dernières observations enregistrées, sans confondre découverte et présence actuelle.</p>
+<section class="stats" aria-label="Résumé des appareils affichés">
+<div class="stat"><span class="note">Appareils affichés</span><strong>{{ devices|length }}</strong></div>
+<div class="stat"><span class="note">À valider ou confirmer</span><strong>{{ (devices|selectattr('status', 'equalto', 'unknown')|list|length) + (devices|selectattr('status', 'equalto', 'to_confirm')|list|length) }}</strong></div>
+<div class="stat"><span class="note">Avec un résultat ICMP enregistré</span><strong>{{ devices|rejectattr('ping_online', 'equalto', none)|list|length }}</strong></div>
+</section>
+<div class="status-bar">
+<span class="badge {{ health_class }}">Collecteur : {{ health_label }}</span>
+<span class="badge {{ 'ok' if monitoring_enabled else 'warn' }}">Suivi configuré : {{ 'activé' if monitoring_enabled else 'désactivé' }}</span>
+</div>
+<p class="note">La configuration ne prouve pas que la boucle de suivi fonctionne actuellement.
+{% if health.last_success_at %}Dernier scan réussi : {{ health.last_success_at|paris_datetime }} (heure de Paris).{% else %}Aucun scan réussi enregistré.{% endif %}</p>
+<div class="panel table-scroll" role="region" aria-label="Liste des appareils" tabindex="0">
 <table>
-<thead><tr><th>Nom</th><th>MAC</th><th>IP</th><th>Fabricant</th><th>Statut</th><th>ICMP</th><th>Vu pour la dernière fois</th></tr></thead>
+<thead><tr><th scope="col">Appareil</th><th scope="col">Adresses</th><th scope="col">Fabricant réseau</th><th scope="col">Validation</th><th scope="col">Dernier résultat ICMP</th><th scope="col">Dernière observation</th></tr></thead>
 <tbody>
 {% for d in devices %}
 <tr>
-<td><a href="/devices/{{ d['id'] }}">{{ d['alias'] or d['hostname'] or '—' }}</a></td>
-<td><code>{{ d['mac'] }}</code>{% if d['is_randomized_mac'] %} <span class="note">(MAC privée)</span>{% endif %}</td>
-<td>{{ d['ip'] or '—' }}</td>
-<td>{{ d['vendor'] or '—' }}</td>
-<td><span class="badge">{{ d['status'] }}</span></td>
-<td>{% if d['ping_online'] is none %}—{% elif d['ping_online'] %}répond{% else %}sans réponse{% endif %}</td>
-<td>{{ d['last_seen'] }}</td>
+<td><a class="device-name" href="/devices/{{ d['id'] }}">{{ d['alias'] or d['hostname'] or ('Appareil n°' ~ d['id']) }}</a>{% if not d['alias'] and not d['hostname'] %}<span class="secondary note">Nom à renseigner</span>{% endif %}</td>
+<td>{{ d['ip'] or 'IP non renseignée' }}<code class="secondary">{{ d['mac'] }}</code>{% if d['is_randomized_mac'] %}<span class="secondary note">MAC privée / locale</span>{% endif %}</td>
+<td>{{ d['vendor'] or 'Non renseigné' }}</td>
+<td><span class="badge {{ 'ok' if d['status'] == 'known' else 'warn' if d['status'] in ['unknown', 'to_confirm'] else '' }}">{{ labels.get(d['status'], 'Non classé') }}</span></td>
+<td>{% if d['ping_online'] is none %}<span class="note">Pas encore mesuré</span>{% elif d['ping_online'] %}<span class="badge ok">Réponse reçue</span>{% else %}<span class="badge warn">Sans réponse</span>{% endif %}</td>
+<td>{{ d['last_seen']|paris_datetime }}<span class="secondary note">Heure de Paris</span></td>
 </tr>
 {% else %}
-<tr><td colspan="7">Aucun appareil enregistré. Lance <code>nettracker scan-once</code>.</td></tr>
+<tr><td class="empty" colspan="6">Aucun appareil enregistré. Lancez une découverte locale pour alimenter cette liste.</td></tr>
 {% endfor %}
 </tbody>
 </table>
-<p class="note">Lecture seule. Une réponse ICMP n'est pas une preuve d'identité ; l'absence de réponse n'est pas une preuve de déconnexion.</p>
+</div>
+<p class="note">Jusqu'à 500 appareils sont affichés ; les compteurs portent sur cette liste, pas sur un inventaire exhaustif du réseau.
+Les résultats ICMP sont historiques. Une absence de réponse ne prouve pas une déconnexion, et une réponse ne prouve pas l'identité d'un appareil.</p>
 {% endblock %}

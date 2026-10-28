@@ -22,6 +22,7 @@ from nettracker.db.device_edits import DEVICE_TYPES, mark_known, update_identity
 from nettracker.db.health import CollectorHealth, collector_health
 from nettracker.errors import NetTrackerError
 from nettracker.web import queries
+from nettracker.web.formatting import paris_datetime
 from nettracker.web.timeseries import load_series
 
 logger = logging.getLogger(__name__)
@@ -101,6 +102,7 @@ def create_app(
     expected = _expected_credential(settings)
     csrf_key = secrets.token_bytes(32)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    templates.env.filters["paris_datetime"] = paris_datetime
     app = FastAPI(title="Home Network Tracker", docs_url=None, redoc_url=None, openapi_url=None)
 
     def csrf_for(device_id: int) -> str:
@@ -180,6 +182,7 @@ def create_app(
             "health": health,
             "health_label": label,
             "health_class": css,
+            "monitoring_enabled": settings.monitor.enabled,
         }
         return templates.TemplateResponse(request, "devices.html", context)
 
