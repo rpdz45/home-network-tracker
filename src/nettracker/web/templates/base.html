@@ -5,29 +5,65 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Home Network Tracker{% endblock %}</title>
 <style>
-body { font-family: system-ui, sans-serif; margin: 0; background: #f6f7f9; color: #1d2330; }
-header { background: #1d2330; color: #fff; padding: .75rem 1.25rem; display: flex; gap: 1.25rem; }
-header a { color: #cfe3ff; text-decoration: none; }
-main { max-width: 72rem; margin: 1.25rem auto; padding: 0 1rem; }
+:root { color-scheme: light; --ink: #17263e; --muted: #53657b; --line: #dce4ef; --blue: #174ec9; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Segoe UI", system-ui, sans-serif; background: #f3f6fb; color: var(--ink); line-height: 1.5; }
+a { color: var(--blue); text-underline-offset: .2em; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 3px solid #ba6200; outline-offset: 3px; }
+header { background: #14243e; color: #fff; }
+.header-inner { max-width: 82rem; margin: auto; padding: 1rem 2rem; display: flex; flex-wrap: wrap; align-items: center; gap: 2rem; }
+.brand { display: flex; align-items: center; gap: .75rem; color: #fff; text-decoration: none; font-weight: 700; }
+.brand-mark { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .75rem; background: #3265df; }
+nav { display: flex; flex-wrap: wrap; gap: 1.5rem; }
+nav a { color: #e3ecff; text-decoration: none; }
+main { max-width: 82rem; margin: 2rem auto; padding: 0 2rem; }
+h1 { margin: .25rem 0 .5rem; font-size: clamp(1.8rem, 4vw, 2.5rem); letter-spacing: -.035em; }
+h2 { font-size: 1.25rem; }
+.eyebrow { margin: 0; color: var(--blue); font-size: .8rem; font-weight: 700; letter-spacing: .1em; }
+.note, .lede { color: var(--muted); }
+.note { font-size: .875rem; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.stat, .panel { background: #fff; border: 1px solid var(--line); border-radius: 1rem; }
+.stat { padding: 1.25rem; }
+.stat strong { display: block; font-size: 1.8rem; }
+.status-bar { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: center; margin: 1rem 0; }
+.table-scroll { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; background: #fff; margin-bottom: 1.5rem; }
-th, td { border-bottom: 1px solid #e3e6ec; padding: .45rem .6rem; text-align: left; font-size: .92rem; }
-th { background: #eef1f6; }
-.badge { display: inline-block; padding: .05rem .5rem; border-radius: .6rem; background: #e3e6ec; }
-.ok { background: #d6f5df; }
-.warn { background: #ffe9b8; }
-.bad { background: #ffd0d0; }
-.note { color: #5a6475; font-size: .85rem; }
-code { font-size: .85rem; }
-dl { display: grid; grid-template-columns: 12rem 1fr; gap: .3rem 1rem; background: #fff; padding: 1rem; }
-dt { color: #5a6475; }
-dd { margin: 0; }
-input, button { font-size: 1rem; padding: .4rem .6rem; }
+.panel table { margin: 0; }
+th, td { border-bottom: 1px solid var(--line); padding: 1rem; text-align: left; font-size: .9rem; vertical-align: top; }
+th { background: #f5f8fc; color: var(--muted); font-weight: 600; }
+.panel tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover { background: #f7faff; }
+.device-name { font-weight: 600; }
+.secondary { display: block; margin-top: .25rem; }
+.badge { display: inline-block; padding: .2rem .65rem; border-radius: 2rem; background: #edf1f7; color: #35465c; font-size: .8rem; }
+.ok { background: #e1f5e9; color: #17623a; }
+.warn { background: #fff0d0; color: #795000; }
+.bad { background: #ffe4e4; color: #932b2b; }
+.empty { padding: 2rem; text-align: center; }
+code { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; overflow-wrap: anywhere; }
+dl { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: .75rem 1rem; background: #fff; border: 1px solid var(--line); border-radius: 1rem; padding: 1.5rem; }
+dt { color: var(--muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+input, button, select { font: inherit; padding: .65rem .8rem; border: 1px solid #a9b8cb; border-radius: .5rem; max-width: 100%; }
+button { background: var(--blue); color: #fff; cursor: pointer; border-color: var(--blue); }
+footer { margin: 2rem 0; color: var(--muted); font-size: .8rem; }
+@media (max-width: 700px) {
+  main { padding: 0 1rem; margin-top: 1.5rem; }
+  .header-inner { padding: 1rem; gap: 1rem; }
+  .stats { grid-template-columns: 1fr; }
+  dl { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
-<header><strong>Home Network Tracker</strong><a href="/">Appareils</a><a href="/events">Événements</a></header>
+<header><div class="header-inner">
+<a class="brand" href="/"><span class="brand-mark" aria-hidden="true">HN</span>Home Network Tracker</a>
+<nav aria-label="Navigation principale"><a href="/">Appareils</a><a href="/events">Événements</a></nav>
+</div></header>
 <main>
 {% block content %}{% endblock %}
+<footer>Application locale · Aucune actualisation réseau déclenchée par cette page.</footer>
 </main>
 </body>
 </html>
