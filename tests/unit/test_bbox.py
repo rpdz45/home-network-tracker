@@ -18,22 +18,41 @@ REPLIES = {
 }
 
 
+def json_transport(reply: object) -> httpx.MockTransport:
+    return httpx.MockTransport(lambda _: httpx.Response(200, json=reply))
+
+
+def status_transport(
+    calls: list[str], status: int, *, headers: dict[str, str] | None = None
+) -> httpx.MockTransport:
+    def handle(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        return httpx.Response(status, headers=headers)
+
+    return httpx.MockTransport(handle)
+
+
 class BboxDiagnosticTests(unittest.TestCase):
+    def accessible_transport(self, calls: list[str], wrapped: bool) -> httpx.MockTransport:
+        def handle(request: httpx.Request) -> httpx.Response:
+            self.assertEqual(request.method, "GET")
+            self.assertNotIn("authorization", request.headers)
+            self.assertEqual(request.content, b"")
+            calls.append(request.url.path)
+            reply = REPLIES[request.url.path]
+            return httpx.Response(200, json=[reply] if wrapped else reply)
+
+        return httpx.MockTransport(handle)
+
     def test_accessible_endpoints_with_both_envelopes(self) -> None:
         for wrapped in [False, True]:
             with self.subTest(wrapped=wrapped):
                 calls: list[str] = []
-
-                def handle(request: httpx.Request) -> httpx.Response:
-                    self.assertEqual(request.method, "GET")
-                    self.assertNotIn("authorization", request.headers)
-                    self.assertEqual(request.content, b"")
-                    calls.append(request.url.path)
-                    reply = REPLIES[request.url.path]
-                    return httpx.Response(200, json=[reply] if wrapped else reply)
-
                 result = bbox.read_diagnostic(
-                    ORIGIN, NETWORKS, enabled=True, transport=httpx.MockTransport(handle)
+                    ORIGIN,
+                    NETWORKS,
+                    enabled=True,
+                    transport=self.accessible_transport(calls, wrapped),
                 )
                 self.assertEqual(calls, list(REPLIES))
                 self.assertTrue(all(p.state == bbox.ProbeState.ACCESSIBLE for p in result))
@@ -89,13 +108,8 @@ class BboxDiagnosticTests(unittest.TestCase):
         ]:
             with self.subTest(status=status):
                 calls: list[str] = []
-
-                def handle(request: httpx.Request) -> httpx.Response:
-                    calls.append(request.url.path)
-                    return httpx.Response(status)
-
                 result = bbox.read_diagnostic(
-                    ORIGIN, NETWORKS, enabled=True, transport=httpx.MockTransport(handle)
+                    ORIGIN, NETWORKS, enabled=True, transport=status_transport(calls, status)
                 )
                 self.assertEqual(len(calls), 1)
                 self.assertEqual(result, (bbox.EndpointProbe("/api/v1/device", state),))
@@ -116,25 +130,18 @@ class BboxDiagnosticTests(unittest.TestCase):
         for status in [302, 429, 500]:
             with self.subTest(status=status):
                 calls: list[str] = []
-
-                def handle(request: httpx.Request) -> httpx.Response:
-                    calls.append(request.url.path)
-                    return httpx.Response(status, headers={"Location": "https://example.com"})
-
+                transport = status_transport(
+                    calls, status, headers={"Location": "https://example.com"}
+                )
                 with self.assertRaises(bbox.BboxError):
-                    bbox.read_diagnostic(
-                        ORIGIN, NETWORKS, enabled=True, transport=httpx.MockTransport(handle)
-                    )
+                    bbox.read_diagnostic(ORIGIN, NETWORKS, enabled=True, transport=transport)
                 self.assertEqual(len(calls), 1)
 
     def test_unrecognized_json_is_not_accessible(self) -> None:
         for reply in [[], [{}, {}], {"device": []}, {"error": "private detail"}]:
             with self.subTest(reply=reply), self.assertRaises(bbox.BboxError) as captured:
                 bbox.read_diagnostic(
-                    ORIGIN,
-                    NETWORKS,
-                    enabled=True,
-                    transport=httpx.MockTransport(lambda _: httpx.Response(200, json=reply)),
+                    ORIGIN, NETWORKS, enabled=True, transport=json_transport(reply)
                 )
             self.assertNotIn("private detail", str(captured.exception))
 
@@ -174,3 +181,23 @@ class BboxDiagnosticTests(unittest.TestCase):
         )
         with self.assertRaises(bbox.BboxError):
             bbox.read_diagnostic(ORIGIN, NETWORKS, enabled=True, transport=transport)
+
+    def test_transports_keep_case_values_after_the_loop(self) -> None:
+        statuses = [401, 403, 404]
+        calls_by_case: list[list[str]] = [[] for _ in statuses]
+        transports = [
+            status_transport(calls, status)
+            for calls, status in zip(calls_by_case, statuses, strict=True)
+        ]
+        request = httpx.Request("GET", ORIGIN + "/api/v1/device")
+        for transport, status in zip(transports, statuses, strict=True):
+            self.assertEqual(transport.handle_request(request).status_code, status)
+        self.assertEqual(calls_by_case, [["/api/v1/device"] for _ in statuses])
+        payloads = [{"case": 1}, {"case": 2}]
+        json_transports = [json_transport(payload) for payload in payloads]
+        for transport, payload in zip(json_transports, payloads, strict=True):
+            self.assertEqual(transport.handle_request(request).json(), payload)
+        unwrapped = self.accessible_transport([], False)
+        wrapped = self.accessible_transport([], True)
+        self.assertIsInstance(unwrapped.handle_request(request).json(), dict)
+        self.assertIsInstance(wrapped.handle_request(request).json(), list)
