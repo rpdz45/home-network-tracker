@@ -62,15 +62,13 @@ def test_default_page_is_inert_without_database(tmp_path: Path) -> None:
         assert response.status_code == 200
         assert "Diagnostic désactivé" in response.text
         assert 'href="/routers"' in response.text
-        assert '<form' not in response.text
+        assert "<form" not in response.text
         assert response.headers["Cache-Control"] == "no-store"
         assert client.post("/routers/bbox/diagnose", data={}).status_code == 403
     assert not (tmp_path / "not-created.db").exists()
 
 
-def test_enabled_get_still_never_reads(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_enabled_get_still_never_reads(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     activate(monkeypatch)
     with make_client(tmp_path) as client:
         assert form(client)["confirm"] == "yes"
@@ -82,7 +80,7 @@ def test_missing_dashboard_token_cannot_diagnose(
 ) -> None:
     activate(monkeypatch)
     with make_client(tmp_path, authenticated=False) as client:
-        assert '<form' not in client.get("/routers").text
+        assert "<form" not in client.get("/routers").text
         assert client.post("/routers/bbox/diagnose", data={}).status_code == 403
 
 
@@ -184,5 +182,5 @@ def test_invalid_target_is_not_rendered_or_used(
         assert "<script>bad</script>" not in response.text
         assert "&lt;script&gt;bad&lt;/script&gt;" not in response.text
         assert "Adresse Bbox invalide" in response.text
-        assert '<form' not in response.text
+        assert "<form" not in response.text
         assert client.post("/routers/bbox/diagnose", data={}).status_code == 403
