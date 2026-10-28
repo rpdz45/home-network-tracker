@@ -1,31 +1,141 @@
-# M3 — Première boucle ICMP explicitement autorisée
+# M3 — Boucle ICMP manuelle, rafraîchissement et rétention optionnels
 
-## Périmètre et commande
+## Périmètre actuel
 
-Ce premier lot ajoute une entrée de module, sans modifier nettracker monitor-once ni ajouter encore une sous-commande nettracker monitor-loop : python -m nettracker.monitor.loop. Le module ne découvre aucun appareil, ne supprime rien, n’envoie aucune notification et ne démarre pas le dashboard. Il ne remplace pas un service système ou une tâche planifiée M6.
+L'entrée est `python -m nettracker.monitor.loop`, pas une sous-commande
+`nettracker monitor-loop`. Elle suit seulement les IDs explicitement choisis,
+peut rafraîchir leurs observations depuis le cache local et peut appliquer deux
+politiques de rétention indépendantes. Toutes ces options sont explicites.
+Elle n'inscrit pas automatiquement de nouveaux appareils, ne démarre ni dashboard,
+ni service système, ni tâche planifiée et n'envoie aucune notification.
 
-L’exécution réelle émet des paquets ICMP uniquement sur les appareils sélectionnés et autorisés. Elle nécessite monitor.enabled=true dans la configuration et --enable-monitoring. alerts.dry_run n’empêche pas ces sondes : ce n’est pas un mode de simulation de la collecte. Remplacer les identifiants des exemples par ceux de tes appareils, sur ton propre réseau seulement.
+Le mode `--continuous` reste au premier plan tant que le processus fonctionne.
+Ce n'est pas un déploiement M6 : pas de reprise automatique après erreur ou reboot.
+Le dashboard se lance séparément et ne réalise lui-même aucune collecte.
 
-Exemple borné : python -m nettracker.monitor.loop --config config.toml --device-id 1 --enable-monitoring --cycles 3 --interval-seconds 60. Plusieurs --device-id sont acceptés, jamais d’énumération automatique. Sans --cycles ni --continuous, un seul cycle est exécuté. --continuous est un opt-in explicite et incompatible avec --cycles.
+## Avant un essai sur son propre réseau
 
-## Ordonnancement
+- Installer le paquet et choisir son environnement virtuel.
+- Adapter et valider `config.toml` sans publier de donnée du foyer ou de secret.
+  Aucun CIDR réel du propriétaire n'est supposé par ce guide.
+- Initialiser la base avec les commandes du README ; sauvegarder avant migration
+  ou suppression. La boucle exige une base existante au schéma courant et ne la
+  migre pas implicitement. `.env` est lu depuis le répertoire courant.
+- Inscrire préalablement les appareils via la découverte et relever leurs IDs.
+  Les IDs des exemples sont des valeurs à remplacer, pas une sélection recommandée.
+- Activer `monitor.enabled=true` et fournir `--enable-monitoring`. Sans cette
+  double activation, le suivi est refusé. `allowed_subnets`, fraîcheur, IPv4,
+  conflits d'IP et statuts ignorés/fusionnés restent contrôlés à chaque cycle.
 
-Les cycles sont séquentiels. L’intervalle est un délai après la fin d’un cycle, pas une fréquence départ-à-départ : aucun chevauchement, rattrapage ou lancement en parallèle. Défaut 60 secondes ; entier entre 10 et 86400. Nombre fini de cycles entre 1 et 1000000. L’attente passe par Event.wait, injectable dans les tests ; seuls des compteurs sont conservés en mémoire, pas une liste de résultats.
+Attention : le suivi envoie de vrais pings. `alerts.dry_run` concerne les alertes,
+pas les sondes, la découverte active ou les suppressions. Aucun exemple de cette
+page n'a été exécuté sur le réseau ou la base du propriétaire pendant sa rédaction.
 
-Chaque cycle appelle le monitor_once existant : activation, 1 à 64 identifiants positifs, périmètre privé autorisé, IPv4, fraîcheur de découverte, conflits d’IP et états ignorés/fusionnés sont revérifiés. Les mesures du cycle restent transactionnelles et aucun verrou SQLite n’est gardé pendant l’attente ou le ping. Une erreur arrête la boucle, sans tentative automatique ; les cycles antérieurs déjà validés restent enregistrés.
+## Premier essai borné sans purge
 
-La base doit exister et son schéma correspondre à la version du programme. Le module ne lance aucune migration implicite. .env est lu dans le répertoire courant, comme indiqué par l’appel à load_settings. Les erreurs de domaine ou SQLite donnent le code 2 avec le nom de leur classe, sans imprimer leurs détails ni les secrets de configuration. Un résumé des compteurs est affiché à la fin normale ou après interruption traitée.
+Après les prérequis, pour l'appareil dont l'ID réel est choisi à la place de 1.
+Le rafraîchissement ci-dessous exige aussi `scan.mode="passive"` :
 
-## Arrêt et fraîcheur
+```powershell
+.\.venv\Scripts\python.exe -m nettracker.monitor.loop --config config.toml --device-id 1 --enable-monitoring --refresh-passive --cycles 3 --interval-seconds 60
+```
 
-Ctrl+C pendant l’ordonnanceur est traité avec code 130 ; un cycle interrompu n’est pas compté comme terminé. SIGTERM demande l’arrêt via un Event ; une attente est interrompue, mais un cycle déjà en cours peut aller jusqu’à sa fin. Le handler précédent est restauré et la connexion est fermée. Le délai d’arrêt dépend donc des sondes séquentielles déjà en cours et de leurs timeouts ; aucun arrêt instantané n’est garanti. Exécuter l’entrée CLI dans le thread principal.
+Sur Linux ou Raspberry Pi OS, utiliser `python` de l'environnement virtuel à la
+place du chemin Windows. Plusieurs `--device-id` sont possibles ; entre 1 et
+64 IDs positifs sont acceptés et les doublons sont dédupliqués.
 
-La boucle ne rafraîchit pas les observations de découverte. Avec max_observation_age_seconds=1800 par défaut, elle finira par refuser une observation devenue périmée. Actualiser séparément la découverte avant de reprendre ; ne pas désactiver le garde-fou pour obtenir artificiellement un fonctionnement 24 h. Le mode continu de ce lot n’est donc pas encore une orchestration autonome découverte/suivi.
+Sans `--cycles` ni `--continuous`, un seul cycle est exécuté. Pour un suivi manuel
+continu après validation de l'essai, remplacer `--cycles 3` par `--continuous` ;
+ces deux options sont incompatibles. Aucun consentement à une purge n'est inclus
+dans l'exemple : aucun des deux drapeaux de suppression n'y apparaît.
 
-## Tests et limites connues
+## Rafraîchissement passif : portée et limites
 
-Treize tests ont réussi dans l’environnement de préparation en exécutant le contenu exact du module chargé en mémoire et les tests d’ordonnancement/arguments : cycle unique, répétition, attentes entre cycles uniquement, arrêt avant/durant un cycle, attente interruptible, propagation d’erreur sans reprise, Ctrl+C pendant cycle/attente, bornes et modes CLI incompatibles. Aucune attente réelle, aucun socket, aucun processus ping, aucune donnée du foyer. Syntaxe et limite de 100 caractères vérifiées sur les deux fichiers Python.
+Sans `--refresh-passive`, la boucle ne renouvelle pas les observations ; elles
+peuvent devenir trop anciennes (1800 secondes par défaut). Ne pas désactiver ce
+garde-fou pour simuler un fonctionnement prolongé réussi.
 
-Les chemins CLI complets après chargement de la configuration, les imports du paquet installé, les migrations réelles, les signaux système réels, Ruff, mypy, couverture, audits et CI complète n’ont pas été exécutés pour ce lot. Les tests des garde-fous de monitor_once restent nécessaires en CI ; les tests présents ici ne prouvent pas seuls leur intégration sur plusieurs cycles. Aucun test Windows/Linux sur matériel, réseau réel, durée longue ou déploiement. Le jalon M3 complet reste ouvert.
+Avec l'option, une lecture du cache par cycle valide le résultat avant de
+renouveler uniquement les appareils sélectionnés. Pas de balayage ARP brut,
+nmap, DNS ou mDNS ajouté. Une configuration de scan actif est refusée.
+Un appareil absent, une association ambiguë ou une adresse hors périmètre arrête
+la boucle ; aucune ancienne IP n'est réutilisée pour inventer une mesure hors ligne.
+Le cache peut être ancien ou usurpé : « relu maintenant » ne signifie pas
+« présence récente prouvée » et le ping n'authentifie pas une MAC.
+Voir [M3_PASSIVE_REFRESH.md](M3_PASSIVE_REFRESH.md).
 
-Commande de validation sans réseau : pytest tests/unit/test_monitor_loop.py tests/unit/test_ping.py tests/integration/test_monitoring.py -vv, puis toute la CI. Ne pas fusionner avant revue et CI verte. Le README décrit encore l’absence d’orchestration continue intégrée : cette limite demeure vraie pour l’ensemble découverte/suivi, et cette page précise le nouvel outil de répétition ICMP seul.
+## Purges séparées, désactivées par défaut
+
+Avant activation, sauvegarder et vérifier les aperçus autonomes :
+
+```text
+nettracker prune-history --config config.toml
+nettracker prune-discovery --config config.toml
+```
+
+Ces exemples ne contiennent pas `--apply`. L'aperçu des scans est calculé avant
+suppression des observations : l'application peut ensuite libérer d'autres scans.
+
+| Politique dans la boucle | Autorisations requises | Cadence propre | Borne par passage |
+|---|---|---|---|
+| Anciens pings | `retention.enabled=true` et `--prune-ping` | `--prune-every-cycles N` | Un lot de `retention.batch_size` |
+| Découvertes remplacées et anciens scans inutilisés | `discovery_retention.enabled=true` et `--prune-discovery` | `--discovery-prune-every-cycles N` | Un lot d'observations puis un lot de scans de `discovery_retention.batch_size` |
+
+Chaque cadence vaut 100 cycles réussis par défaut, avec N entre 1 et 1000000.
+Un réglage de cadence sans son drapeau est refusé. Premier passage après N cycles,
+pas au démarrage ni à la sortie en supplément. Un cycle idempotent sans erreur
+compte aussi. `keep_days` et `batch_size` viennent de chaque section de config,
+mais la boucle impose `max_batches=1` même si la configuration autorise davantage.
+Au plus 5000 lignes par lot, pas une garantie de durée ni de résorption du retard.
+
+Les purges sont globales à la base, pas limitées aux IDs suivis. Elles peuvent
+supprimer définitivement des historiques. La découverte conserve notamment sa
+dernière observation par appareil, le dernier scan réussi, les cinq derniers scans
+de statut non réussi par ordre d’ID et les scans encore référencés ou non terminés. Les politiques ne suppriment
+ni appareils, états courants, événements ou notifications. Le seuil strict dépend
+de l'heure UTC système. Les autres données peuvent continuer à croître : aucune
+borne de taille pour la base complète. Les commandes autonomes gardent leur
+activation `--apply`, distincte des drapeaux propres à la boucle.
+
+Détails : [M3_LOOP_PING_RETENTION.md](M3_LOOP_PING_RETENTION.md),
+[M3_LOOP_DISCOVERY_RETENTION.md](M3_LOOP_DISCOVERY_RETENTION.md).
+
+## Ordonnancement, sorties et arrêt
+
+Cycles séquentiels, sans chevauchement ni rattrapage. `--interval-seconds` est un
+délai après chaque cycle terminé, pas une fréquence départ-à-départ : 60 secondes
+par défaut, de 10 à 86400. Un nombre fini de cycles va de 1 à 1000000.
+Ordre : rafraîchissement demandé, suivi, purge ping éventuelle, puis découverte.
+Les mesures d'un cycle sont transactionnelles ; aucun verrou de transaction
+n'est maintenu pendant une sonde ou l'attente entre cycles.
+
+Une erreur de suivi empêche les purges suivantes ; une erreur de purge arrête
+la boucle sans annuler les mesures ou lots déjà validés. Pas de réessai automatique.
+Les erreurs de domaine/SQLite donnent le code 2 et le nom de la classe, sans ses
+détails. Le résumé `cycles=... measurements=...` n'est affiché qu'à la sortie
+normale ou après interruption traitée, pas à chaque cycle. Avec les options,
+il ajoute `pruned_ping_samples=...` et/ou
+`pruned_discovery_observations=... pruned_scans=...`.
+
+Ctrl+C dans l'ordonnanceur renvoie 130. SIGTERM demande l'arrêt via un Event ;
+le handler précédent est restauré et la connexion fermée en sortie gérée.
+Un contrôle précède chaque politique de purge, mais pas les deux phases internes
+découverte/scans. Un travail déjà commencé peut donc finir : pas d'arrêt instantané
+garanti. Les mesures déjà validées peuvent subsister malgré une interruption.
+Exécuter cette entrée CLI dans le thread principal.
+
+## État de validation et limites M3
+
+Les contrôles qualité Linux, Windows et gitleaks des PR #38 et #39 ont réussi
+le 27 octobre 2026 sur les têtes 62137b54 et 8648256d respectivement. Les bases
+et transports des scénarios de test sont synthétiques. Ces validations ne sont
+ni des essais de la commande sur matériel réel ni une endurance de 24 heures.
+Le diagnostic `resource_profile` reste synthétique et sa mémoire tracemalloc
+n'est pas le RSS. Il ne constitue pas une preuve générale d'absence de fuite.
+
+Cette mise à jour est documentaire seulement : aucun nouveau test, aucune
+configuration ni activation de collecte/purge. Les options ont été relues dans
+le code de la branche ; les commandes ci-dessus n'ont pas été exécutées pendant
+la rédaction. Revue et CI de la PR documentaire restent nécessaires avant fusion.
+La validation terrain, l'endurance réelle et le déploiement restent à documenter
+avec leurs résultats effectifs. Le jalon M3 complet reste ouvert.

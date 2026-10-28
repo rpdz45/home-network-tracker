@@ -4,11 +4,11 @@ Outil local de suivi du réseau domestique : découverte des appareils, mesures 
 
 ## État du projet
 
-Disponibles : configuration validée, découverte passive, ARP actif explicitement autorisé, repli nmap optionnel et borné, fabricants OUI locaux, DNS inverse/mDNS optionnels, suggestions pour MAC aléatoires, liste known_devices, monitor-once, rétention de l’historique, santé du collecteur et traitement des alertes en dry-run.
+Disponibles : configuration validée, découverte passive, ARP actif explicitement autorisé, repli nmap optionnel et borné, fabricants OUI locaux, DNS inverse/mDNS optionnels, suggestions pour MAC aléatoires, liste known_devices, monitor-once, boucle ICMP manuelle avec rafraîchissement passif et rétentions optionnels, rétention de l’historique, santé du collecteur et traitement des alertes en dry-run.
 
 Le dashboard M5 est disponible : liste et fiche des appareils, événements, santé du collecteur, alias/type, marquage comme connu et historique ICMP 24 h / 7 jours. Les graphiques agrègent les sondes de la fenêtre en 96 créneaux, sans dépendre des 25 observations du tableau.
 
-Restent notamment à livrer ou valider : planification continue, notifiers Discord/Telegram/e-mail, règles avancées, déploiement M6 et tests sur matériel réel. Le ratio réponses/sondes n’est pas un uptime temporel ; les créneaux sans mesure restent inconnus. La feuille de route de [AGENTS.md](AGENTS.md) reste la référence : les jalons complets ne sont pas déclarés terminés par cette liste.
+Restent notamment à livrer ou valider : démarrage et reprise automatiques en service, notifiers Discord/Telegram/e-mail, règles avancées, déploiement M6 et tests sur matériel réel. Le ratio réponses/sondes n’est pas un uptime temporel ; les créneaux sans mesure restent inconnus. La feuille de route de [AGENTS.md](AGENTS.md) reste la référence : les jalons complets ne sont pas déclarés terminés par cette liste.
 
 ## Avertissement et prérequis
 
@@ -75,9 +75,12 @@ nettracker serve [--config CHEMIN]
 nettracker scan-once [--config CHEMIN] [--resolve-names] [--resolve-mdns] [--oui-file CHEMIN]
 nettracker monitor-once [--config CHEMIN] --device-id ID [--device-id ID] --enable-monitoring
 nettracker prune-history [--config CHEMIN] [--apply]
+nettracker prune-discovery [--config CHEMIN] [--apply]
 nettracker health-check [--config CHEMIN]
 nettracker process-alerts [--config CHEMIN]
 ```
+
+La boucle périodique est une entrée de module distincte : `python -m nettracker.monitor.loop --help`, pas une sous-commande `nettracker monitor-loop`.
 
 init-db est relançable et applique les migrations. Sauvegarder la base avant une migration ou une suppression réelle.
 
@@ -91,11 +94,19 @@ Avec --resolve-mdns et --resolve-names, mDNS précède le DNS inverse en l’abs
 
 ### Mesures ICMP
 
-monitor-once exige monitor.enabled=true et --enable-monitoring, uniquement pour les appareils explicitement sélectionnés, récemment découverts et dans le périmètre autorisé. Les latences, pertes et transitions restent locales. Pas encore de planification continue intégrée. Voir [M3_MONITORING.md](docs/M3_MONITORING.md).
+monitor-once exige monitor.enabled=true et --enable-monitoring, uniquement pour les appareils explicitement sélectionnés, récemment découverts et dans le périmètre autorisé. Les latences, pertes et transitions restent locales. Voir [M3_MONITORING.md](docs/M3_MONITORING.md).
+
+La boucle `python -m nettracker.monitor.loop` répète ce suivi sur les IDs choisis. Un cycle par défaut ; `--cycles N` pour un essai borné ou `--continuous` pour rester au premier plan, sans reprise automatique après erreur ou redémarrage. `--refresh-passive` renouvelle seulement les observations des appareils sélectionnés depuis le cache local, avec `scan.mode="passive"`. Sans cette option, une découverte périmée continue de bloquer le suivi. Un cache relu ne prouve ni présence récente ni identité MAC.
+
+Ces commandes peuvent envoyer de vrais pings : `alerts.dry_run` ne les rend pas fictifs. Le guide [M3_MONITOR_LOOP.md](docs/M3_MONITOR_LOOP.md) détaille les prérequis, un exemple Windows borné, l'arrêt et les limites. Le dashboard reste un processus séparé ; aucun service système ni tâche planifiée n'est installé par la boucle.
 
 ### Rétention
 
-prune-history ne supprime que les anciens échantillons source=ping, jamais les appareils, découvertes, événements ou notifications. Aperçu par défaut ; suppression réelle uniquement avec retention.enabled=true et --apply. Paramètres : keep_days=30 (1 à 3650), batch_size=500 (1 à 5000), max_batches=100 (1 à 1000). Au plus batch_size × max_batches lignes par exécution ; relancer si nécessaire. Pas de planification automatique.
+prune-history ne supprime que les anciens échantillons source=ping, jamais les appareils, découvertes, événements ou notifications. Aperçu par défaut ; suppression réelle uniquement avec retention.enabled=true et --apply. Paramètres : keep_days=30 (1 à 3650), batch_size=500 (1 à 5000), max_batches=100 (1 à 1000). Au plus batch_size × max_batches lignes par exécution ; relancer si nécessaire. Cette commande autonome ne se planifie pas elle-même.
+
+`prune-discovery` propose un aperçu séparé. La suppression exige `discovery_retention.enabled=true` et `--apply`, indépendamment des pings. La dernière découverte de chaque appareil et les scans protégés sont conservés. Voir [M3_DISCOVERY_PRUNE_CLI.md](docs/M3_DISCOVERY_PRUNE_CLI.md).
+
+Dans la boucle uniquement, `--prune-ping` et `--prune-discovery` activent les politiques correspondantes après des cycles réussis, chacune exigeant aussi sa propre autorisation de configuration. Cadences indépendantes de 100 cycles par défaut, réglées par `--prune-every-cycles` et `--discovery-prune-every-cycles`. Un seul lot par passage pour les pings ; un lot d'observations puis un lot de scans pour la découverte, même si `max_batches` est supérieur à un en configuration. Ces suppressions sont globales à la base, pas limitées aux IDs suivis. Vérifier les aperçus et sauvegarder avant activation. Aucune taille maximale de toute la base n'est garantie. Voir [M3_LOOP_PING_RETENTION.md](docs/M3_LOOP_PING_RETENTION.md) et [M3_LOOP_DISCOVERY_RETENTION.md](docs/M3_LOOP_DISCOVERY_RETENTION.md).
 
 ### Santé et alertes
 
@@ -116,13 +127,15 @@ pip-audit
 
 La CI vérifie la qualité sur Linux et Windows et recherche les secrets avec gitleaks. Une CI verte ne remplace pas les essais sur matériel réel. Aucun test du projet ne doit envoyer de paquets réels ; les tests HTTP utilisent un client en processus, une horloge fixe et des données de test, sans navigateur réseau.
 
-Ce lot de consolidation ajoute dix fonctions de test HTTP, dont cinq cas paramétrés de période invalide. Leur syntaxe et la longueur des lignes ont été vérifiées pendant la préparation, mais leur exécution et Ruff restent à valider en CI. Ne pas les présenter comme réussis avant ce contrôle. Les essais navigateur/mobile, charge et LAN restent à réaliser.
+Les essais navigateur/mobile, de charge, d’endurance réelle et sur le LAN doivent être documentés séparément avec leurs résultats effectifs. Les diagnostics de ressources synthétiques ne mesurent pas le RSS et ne démontrent pas une absence générale de fuite mémoire. Le jalon M3 complet reste ouvert.
 
 ## Documentation
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md), [SECURITY.md](docs/SECURITY.md), [TESTING.md](docs/TESTING.md)
 - [M2_PASSIVE.md](docs/M2_PASSIVE.md), [MDNS.md](docs/MDNS.md)
 - [M3_MONITORING.md](docs/M3_MONITORING.md), [M3_HEALTH.md](docs/M3_HEALTH.md)
+- [M3_MONITOR_LOOP.md](docs/M3_MONITOR_LOOP.md), [M3_PASSIVE_REFRESH.md](docs/M3_PASSIVE_REFRESH.md)
+- [M3_LOOP_PING_RETENTION.md](docs/M3_LOOP_PING_RETENTION.md), [M3_LOOP_DISCOVERY_RETENTION.md](docs/M3_LOOP_DISCOVERY_RETENTION.md)
 - [M4_ALERTS.md](docs/M4_ALERTS.md)
 - [M5_DASHBOARD.md](docs/M5_DASHBOARD.md), [M5_DEVICE_EDITS.md](docs/M5_DEVICE_EDITS.md), [M5_HISTORY_CHARTS.md](docs/M5_HISTORY_CHARTS.md)
 - [AGENTS.md](AGENTS.md) : feuille de route et règles de contribution
