@@ -169,8 +169,10 @@ def read_snapshot(
             {"expression": "physical and !self and !voice"},
             context=context,
         ).get("status")
-        if not isinstance(devices, list) or len(devices) > MAX_DEVICES or not all(
-            isinstance(device, dict) for device in devices
+        if (
+            not isinstance(devices, list)
+            or len(devices) > MAX_DEVICES
+            or not all(isinstance(device, dict) for device in devices)
         ):
             raise LiveboxError("unexpected Livebox device list")
         return LiveboxSnapshot("Livebox 5", firmware, tuple(dict(device) for device in devices))

@@ -204,11 +204,7 @@ def test_invalid_authentication_stops_before_device_read(authentication: object)
 
     def handle(request: httpx.Request) -> httpx.Response:
         calls.append(request)
-        reply = (
-            {"status": {"ProductClass": "Livebox Fibre"}}
-            if len(calls) == 1
-            else authentication
-        )
+        reply = {"status": {"ProductClass": "Livebox Fibre"}} if len(calls) == 1 else authentication
         return httpx.Response(200, json=reply)
 
     with pytest.raises(livebox5.LiveboxError):
