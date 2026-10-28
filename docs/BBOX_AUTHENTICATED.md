@@ -1,98 +1,68 @@
-# Client Bbox authentifié : connexion et inventaire
+# Bbox : inventaire administrateur
 
-## Fonction de ce lot
+Le client authentifié est raccordé à `/routers/bbox`, lié depuis « Routeurs ».
+GET sans appel réseau ; POST `/routers/bbox/read` pour connexion, inventaire et
+tentative de déconnexion. Diagnostic et Livebox restent distincts. Aucun
+blocage/déblocage ni changement de politique globale ou calendrier. Compatibilité
+WiFi 7 XT et efficacité des règles non certifiées.
 
-`routers.bbox_session.read_authenticated_snapshot` effectue une connexion
-administrateur et retourne un inventaire normalisé. C'est un nouveau module ;
-le diagnostic Bbox existant et les lecteurs Livebox restent inchangés.
-Ce lot n'est pas encore raccordé au dashboard et n'implémente aucun blocage,
-déblocage, changement de calendrier, filtrage Wi-Fi ou politique globale.
-Le nom de branche décrit la mission globale, pas des fonctions déjà livrées.
+## Configuration du processus serveur
 
-## Protocole étudié
+- `NETTRACKER_BBOX_AUTH_ENABLED=true` : activation distincte du diagnostic.
+- `NETTRACKER_BBOX_URL` : IPv4 RFC1918 autorisée par allowed_subnets, port standard.
+- `NETTRACKER_BBOX_PASSWORD` : secret administrateur local, encapsulé en SecretStr.
+- `NETTRACKER_BBOX_EXPECTED_MODEL` : modelname API exact, 1 à 128 caractères.
+- `NETTRACKER_BBOX_CA_FILE` : facultatif, autorités de certification locales approuvées.
+- `NETTRACKER_BBOX_ALLOW_HTTP=true` : accord explicite pour HTTP non chiffré.
 
-Référence communautaire : https://github.com/hadamrd/bbox-cli , notamment
-`pkg/client/client.go`, `pkg/client/endpoints.go`, `cmd/host.go` et `cmd/status.go`.
-Aucun code de ce projet n'est importé. Les appels retenus sont :
+Jeton api.token obligatoire, même en loopback. Variables lues à la création de
+l'application : redémarrer après modification. Le chargeur `.env` actuel ne les
+injecte pas automatiquement dans os.environ. Les fournir au processus par un
+moyen local sûr, jamais dans Git, l'historique des commandes ou ce chat.
+Le formulaire n'accepte aucun secret, URL, modèle ou chemin de certificat.
 
-1. PUT `/api/v1/login`, formulaire password et remember=1 comme la référence.
-2. Vérification qu'un cookie BBOX_ID non vide serait envoyé à la cible.
-3. GET `/api/v1/device`, comparaison exacte du champ modelname avec
-   expected_model fourni par le serveur appelant.
-4. GET `/api/v1/hosts`, enveloppe hosts.list.
-5. Tentative POST `/api/v1/logout` en fin de session, y compris après une
-   erreur de lecture, une fois le cookie utilisable obtenu.
+Relever modelname dans les informations API d'une session administrateur locale,
+sans partager les cookies. Ne pas supposer qu'il vaut le nom commercial.
+Le modèle est contrôlé après envoi du mot de passe : faire confiance à la cible
+avant de le fournir. HTTPS vérifié ; CA ne désactive ni chaîne ni contrôle du
+nom couvrant l'IP. Aucun verify=False, DNS, proxy d'environnement ou redirection.
+HTTP expose mot de passe et cookie ; avertissement explicite à l'écran.
 
-Le modèle est vérifié après envoi du mot de passe, pas avant : aucune
-identification pré-authentification n'est revendiquée. Il faut faire confiance
-à la cible configurée avant de fournir des identifiants. expected_model n'est
-ni une preuve cryptographique ni une certification de firmware. La valeur
-réellement annoncée par la Bbox WiFi 7 XT n'est pas supposée dans le code.
+## Protections et limites
 
-## Autorisations et transport
+Authentification existante, CSRF, origine, Sec-Fetch-Site, confirmation explicite,
+formulaire de 2 Kio et deux champs exacts. Verrou et délai de 15 minutes après
+chaque tentative, réussie ou non ; un refus de cadence ne le prolonge pas.
+Compteur local au processus, remis à zéro au redémarrage : un seul worker requis,
+pas de garantie contre tout verrouillage du firmware. Aucun réessai automatique.
+Échappement HTML, masquage du secret et rendus Cache-Control: no-store.
 
-Activation et confirmation strictement vraies requises, mot de passe SecretStr
-non vide et modèle attendu exact obligatoire. Le module ne lit aucun secret
-sur disque ou dans un navigateur. Un futur raccordement devra charger le
-secret localement et contrôler authentification, CSRF, confirmation et cadence.
-Les booléens de cette API Python ne remplacent pas ces protections web.
+Client : PUT login avec remember=1, cookie BBOX_ID utilisable requis, GET device
+et hosts.list puis tentative POST logout. Référence communautaire étudiée :
+https://github.com/hadamrd/bbox-cli ; aucun code importé de cette référence.
+Corps bornés à 2 Mio, compression refusée, maximum 512 hôtes aux identifiants et
+MAC unicast non nulles uniques. Timeouts par opération, pas un délai global.
+États absents/inconnus : None ; blocked ne prouve pas une coupure et n'est pas
+affiché comme tel. Les IP retournées ne sont ni scannées ni automatiquement
+autorisées comme cibles de contrôle. Pas de réponse brute, numéro de série,
+stockage SQLite, journalisation d'inventaire ou envoi externe. Cookies en mémoire.
+Une demande logout acceptée n'est pas une preuve indépendante de révocation ;
+l'écran avertit si elle échoue. Une session créée peut subsister jusqu'à expiration.
 
-La cible conserve le garde-fou existant : IPv4 RFC1918 comprise dans
-allowed_subnets, ports standards, aucun DNS, proxy d'environnement ou suivi de
-redirection. HTTPS reste vérifié. ca_file permet un fichier d'autorités de
-certification explicitement approuvé localement ; cela ne désactive ni la
-validation de chaîne ni le contrôle du nom. Un certificat ne couvrant pas
-l'IP cible restera refusé, même avec ce fichier. Aucun verify=False.
-HTTP requiert un accord supplémentaire explicite et transmet le mot de passe
-sans chiffrement. Aucun contournement d'authentification ou import de cookie.
+## Validation
 
-Une seule tentative de connexion, aucun réessai ou rafraîchissement de session.
-Les 401, 403, 429, redirections et erreurs serveur sont terminaux. Les timeouts
-HTTPX sont configurables entre 0.1 et 30 secondes par opération, pas un délai
-global. Chaque corps est limité à 2 Mio et les réponses compressées refusées.
-Les erreurs applicatives ne reprennent ni corps, URL, mot de passe ou cookie.
-Aucune journalisation ajoutée et aucun jeton secret dans une URL.
-
-## Inventaire et fermeture
-
-Au maximum 512 appareils ; identifiants entiers non négatifs uniques et MAC
-unicast non nulles uniques. Une ambiguïté fait échouer la lecture plutôt que
-de préparer un futur contrôle sur la mauvaise cible. Les propriétés hostname,
-ipaddress, macaddress, active et blocked sont les seules conservées avec id.
-Les textes sont bornés et les répétitions du mot de passe masquées. Les données
-restent personnelles au foyer : aucun stockage, journalisation ou envoi externe.
-Les adresses retournées sont des données de la box, pas des cibles scannées ni
-des adresses dont l'appartenance au périmètre est garantie par cette lecture.
-
-active et blocked ne sont reconnus que sous forme booléenne ou entière 0/1.
-Un champ absent ou inconnu reste None, jamais False par défaut. blocked reflète
-uniquement le champ communiqué ; cela ne prouve pas une coupure Internet.
-Le modèle et le firmware sont lus via modelname et main.version, avec repli
-sur firmware pour ce dernier. Aucun numéro de série ou réponse brute conservé.
-
-session_closed indique seulement si la requête de déconnexion a reçu un statut
-attendu, pas une preuve indépendante de révocation serveur. Si elle échoue, le
-résultat marque False ; il ne prétend pas que la session est fermée. Sans cookie
-utilisable, aucune lecture ou déconnexion n'est tentée et une erreur est levée.
-La session éventuellement créée peut subsister jusqu'à expiration. Les cookies
-restent en mémoire et sont abandonnés avec le client, sans sauvegarde sur disque.
-
-## Tests et limites
-
-Tests unittest avec HTTPX MockTransport et valeurs synthétiques seulement.
-L'environnement isolé utilise le garde-fou d'origine extrait du module existant
-et la classe de base d'erreur minimale ; cela ne remplace pas la suite du dépôt.
-Aucun paquet, identifiant réel ou inventaire du foyer utilisé. Le protocole et
-la compatibilité du firmware restent à vérifier sur la Bbox du propriétaire.
+Les 16 tests du client ont passé dans l'environnement isolé du lot précédent.
+Les nouveaux tests web utilisent l'application réelle et un lecteur simulé,
+mais ne sont pas exécutés ici : FastAPI est absent. Syntaxe Python et rendu
+Jinja isolé vérifiés seulement. Aucun accès à la box ni test matériel.
 
 ```text
-python -m pytest tests/unit/test_bbox_session.py
+python -m pytest tests/unit/test_bbox_session.py tests/unit/test_web_bbox.py
 python -m ruff check .
 python -m ruff format --check .
 python -m mypy
 python -m pytest --cov
 ```
 
-Le raccordement au dashboard et les écritures de contrôle font partie de la
-suite de la mission, pas de ce correctif. CI Linux/Windows, revue des secrets
-et tests matériels sont nécessaires avant de déclarer une intégration prête.
+CI Linux/Windows, revue des secrets et matériel réel requis avant fusion.
+Le blocage/déblocage reste à implémenter, pas à annoncer comme opérationnel.
