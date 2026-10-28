@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 
 from nettracker.config import Settings
 from nettracker.routers import bbox
+from nettracker.web.livebox_dashboard import install_livebox_dashboard
 
 MAX_FORM_BYTES = 2048
 COOLDOWN_SECONDS = 10
@@ -27,6 +28,7 @@ def install_router_dashboard(
     protected: APIRouter, settings: Settings, templates: Jinja2Templates
 ) -> None:
     """Attach routes before include_router; the caller supplies its authenticated router."""
+    install_livebox_dashboard(protected, settings, templates)
     enabled = os.environ.get("NETTRACKER_BBOX_DIAGNOSTICS_ENABLED") == "true"
     raw_address = os.environ.get("NETTRACKER_BBOX_URL", "")
     allow_http = os.environ.get("NETTRACKER_BBOX_ALLOW_HTTP") == "true"

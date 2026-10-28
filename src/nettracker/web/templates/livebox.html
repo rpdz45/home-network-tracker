@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Livebox 5 · Home Network Tracker{% endblock %}
+{% block content %}
+<p><a href="/routers">Retour aux routeurs</a></p>
+<h1>Livebox 5 — lecture administrateur</h1>
+<p class="lede">Cette lecture utilise l'administration de la box, pas seulement votre connexion au Wi-Fi.</p>
+<p>Blocage et déblocage indisponibles dans ce lot. Compatibilité du firmware non confirmée sur matériel réel.</p>
+{% if not enabled %}<p class="badge warn">Lecture désactivée par défaut</p>{% endif %}
+{% if invalid_address %}<p role="alert">Adresse Livebox invalide ou hors du périmètre autorisé.</p>{% endif %}
+{% if address %}<p>Cible configurée : <code>{{ address }}</code></p>{% else %}<p>Adresse cible absente ou invalide.</p>{% endif %}
+{% if not has_token %}<p>Configurer un jeton du dashboard pour autoriser la lecture.</p>{% endif %}
+{% if not has_password %}<p>Accès administrateur Livebox non configuré côté serveur.</p>{% endif %}
+{% if allow_http %}<p role="alert" class="badge warn">HTTP local autorisé : le mot de passe administrateur et les échanges ne sont pas chiffrés.</p>{% endif %}
+{% if can_read %}
+<form method="post" action="/routers/livebox/read">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<p><label><input type="checkbox" name="confirm" value="yes" required> J'autorise l'identification, une connexion administrateur et la lecture des appareils de cette Livebox.</label></p>
+<button type="submit">Lire les appareils de la Livebox</button>
+</form>
+<p class="note">Aucun mot de passe dans ce formulaire. Attendre 60 secondes entre tentatives. La session créée sur la box peut subsister jusqu'à expiration.</p>
+{% endif %}
+{% if error %}<p role="alert" class="badge bad">Lecture Livebox impossible. Vérifiez la cible, l'accès administrateur et la confiance TLS. Aucun résultat n'est confirmé.</p>{% endif %}
+{% if loaded %}
+<p>{{ rows|length }} appareil(s) retourné(s) par la box. Firmware communiqué : {{ firmware }}.</p>
+<div class="panel table-scroll"><table>
+<caption>Informations communiquées par la Livebox, sans garantie de modèle exact des appareils</caption>
+<thead><tr><th scope="col">Nom</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">État communiqué</th></tr></thead>
+<tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td><code>{{ row.ip }}</code></td><td><code>{{ row.mac }}</code></td><td>{{ row.state }}</td></tr>{% else %}<tr><td colspan="4">Aucun appareil retourné.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="note">Les champs absents ou non reconnus restent « Non renseigné ». Aucun résultat n'est ajouté à SQLite.</p>
+{% endif %}
+<p class="note">Aucune lecture au simple affichage, aucun rafraîchissement automatique et aucune modification des règles d'accès.</p>
+{% endblock %}
