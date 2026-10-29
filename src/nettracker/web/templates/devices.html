@@ -5,6 +5,7 @@
 <p class="eyebrow">TABLEAU DE BORD LOCAL</p>
 <h1>Mes appareils</h1>
 <p class="lede">Des identités lisibles et les dernières observations enregistrées, sans confondre découverte et présence actuelle.</p>
+<p><a href="/identification/fing">Compléter l'identification avec Fing (optionnel)</a></p>
 <section class="stats" aria-label="Résumé des appareils affichés">
 <div class="stat"><span class="note">Appareils affichés</span><strong>{{ devices|length }}</strong></div>
 <div class="stat"><span class="note">À valider ou confirmer</span><strong>{{ (devices|selectattr('status', 'equalto', 'unknown')|list|length) + (devices|selectattr('status', 'equalto', 'to_confirm')|list|length) }}</strong></div>
