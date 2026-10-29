@@ -1,0 +1,58 @@
+{# Presentation only: never change collector state or device trust. #}
+{% macro elapsed(seconds) -%}
+{% if seconds is none %}ancienneté inconnue
+{% elif seconds < 0 %}horodatage dans le futur — vérifier l'horloge
+{% elif seconds < 60 %}moins d'une minute
+{% else %}
+{% set minutes = (seconds // 60)|int %}
+{% if minutes < 60 %}{{ minutes }} min
+{% elif minutes < 1440 %}{{ (minutes // 60)|int }} h{% if minutes % 60 %} {{ minutes % 60 }} min{% endif %}
+{% else %}{{ (minutes // 1440)|int }} j{% if (minutes % 1440) // 60 %} {{ ((minutes % 1440) // 60)|int }} h{% endif %}{% if minutes % 60 %} {{ minutes % 60 }} min{% endif %}
+{% endif %}
+{% endif %}
+{%- endmacro %}
+
+{% macro collection_summary(health) -%}
+{% set last = health.last_success_at|default(none) %}
+{% set age = health.age_seconds|default(none) %}
+{% set stale = health.stale|default(none) %}
+{% if not last %}
+<p class="badge warn">Découverte : aucune collecte réussie</p>
+<p>Aucune date de collecte réussie n'est disponible ; la fraîcheur des données ne peut pas être confirmée.</p>
+{% elif age is not none and age < 0 %}
+<p class="badge warn">Découverte : horodatage à vérifier</p>
+{% elif age is none or stale is none %}
+<p class="badge warn">Découverte : ancienneté inconnue</p>
+{% elif stale %}
+<p class="badge warn">Découverte : à actualiser</p>
+<p>Le délai de fraîcheur configuré est dépassé. Cela ne signifie ni panne de la box, ni appareil déconnecté, ni intrusion.</p>
+{% else %}
+<p class="badge ok">Découverte : collecte récente</p>
+{% endif %}
+{% if last %}
+<p>Dernière collecte réussie : {{ last|paris_datetime }} (heure de Paris).<br>Ancienneté de la collecte : {{ elapsed(age)|trim }}.</p>
+{% endif %}
+<p class="note">Cette date décrit une collecte enregistrée, pas une présence actuelle de tous les appareils. Une lecture du cache peut contenir des observations anciennes. Ouvrir ou actualiser le dashboard ne relance pas la collecte.</p>
+{%- endmacro %}
+
+{% macro mac_note(local) -%}
+{% if local %}<span class="secondary note">Adresse MAC locale (privée possible) — ce n'est pas un signe d'intrusion.</span>{% endif %}
+{%- endmacro %}
+
+{% macro information_guide() -%}
+<details>
+<summary>Comprendre ces informations</summary>
+<dl>
+<dt>Nom affiché</dt><dd>Ton alias personnel est prioritaire. Sinon, un nom réseau est utilisé s'il est disponible ; ce nom n'est pas une identité vérifiée.</dd>
+<dt>IP et MAC</dt><dd>L'IP est une adresse réseau observée et peut changer. La MAC est une adresse d'interface, pas une preuve d'identité. Une MAC locale peut être privée, virtuelle ou configurée manuellement ; cela ne prouve ni un changement aléatoire ni une intrusion.</dd>
+<dt>Fabricant réseau</dt><dd>Un indice sur l'interface réseau, pas nécessairement la marque commerciale de l'appareil ni son modèle. Avec une MAC locale, le préfixe ne permet pas d'attribuer sûrement un fabricant.</dd>
+<dt>Modèle</dt><dd>Un modèle exact ne se déduit pas d'une MAC. L'identification Fing est une source complémentaire optionnelle, non une garantie pour chaque appareil.</dd>
+<dt>Validation personnelle</dt><dd>« Reconnu » signifie classé comme connu par toi, pas authentifié par le réseau. « À valider » ou « À confirmer » ne signifie pas automatiquement indésirable. « Ignoré » ne bloque aucun accès.</dd>
+<dt>ICMP / ping</dt><dd>Une réponse est le résultat d'un test enregistré. Sans réponse ne prouve pas une déconnexion : certains appareils ne répondent pas aux pings. Aucun test enregistré signifie inconnu, pas hors ligne.</dd>
+<dt>Latence et perte</dt><dd>La latence mesure le délai d'une réponse en millisecondes. La perte décrit les sondes sans réponse pendant le test ; ce n'est pas une preuve d'identité ni une mesure continue de disponibilité.</dd>
+<dt>Fraîcheur et suivi</dt><dd>La dernière collecte indique quand une découverte a réussi. « Suivi configuré » décrit une autorisation, pas la preuve qu'un processus tourne. Le dashboard ne lance pas automatiquement collecte ou ping.</dd>
+<dt>Retirer un appareil</dt><dd>Ignorer ou effacer une fiche ne coupe ni le Wi-Fi ni Internet. Cette vue n'ajoute aucune commande de blocage.</dd>
+</dl>
+<p><a href="/identification/fing">Consulter l'identification Fing (optionnel)</a></p>
+</details>
+{%- endmacro %}

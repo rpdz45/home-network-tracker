@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "presentation.html" import local_time %}
+{% from "device_information.html" import mac_note, information_guide %}
 {% block title %}Appareil · Home Network Tracker{% endblock %}
 {% block content %}
 {% set types = {'computer': 'Ordinateur', 'phone': 'Téléphone', 'network': 'Équipement réseau', 'iot': 'Objet connecté', 'tv': 'Télévision', 'nas': 'NAS', 'camera': 'Caméra', 'other': 'Autre'} %}
@@ -11,16 +12,17 @@
 <h2>Identité et repères</h2>
 <dl>
 <dt>Nom personnalisé</dt><dd>{{ device['alias'] or 'Non renseigné' }}</dd>
-<dt>Nom réseau</dt><dd>{{ device['hostname'] or 'Non renseigné' }}</dd>
-<dt>Type</dt><dd>{{ types.get(device['device_type'], 'Non renseigné') }}</dd>
-<dt>Fabricant réseau</dt><dd>{{ device['vendor'] or 'Non renseigné' }}</dd>
-<dt>Modèle</dt><dd>Non disponible à ce stade</dd>
-<dt>Adresse MAC</dt><dd><code>{{ device['mac'] }}</code>{% if device['is_randomized_mac'] %} <span class="note">(MAC privée / locale)</span>{% endif %}</dd>
+<dt>Nom réseau annoncé</dt><dd>{{ device['hostname'] or 'Non renseigné' }}</dd>
+<dt>Type renseigné</dt><dd>{{ types.get(device['device_type'], 'Non renseigné') }}</dd>
+<dt>Fabricant réseau (interface)</dt><dd>{{ device['vendor'] or 'Non renseigné' }}</dd>
+<dt>Modèle</dt><dd>Non disponible à ce stade dans la fiche locale. <a href="/identification/fing">Consulter les modèles fournis par Fing (optionnel)</a>.</dd>
+<dt>Adresse MAC</dt><dd><code>{{ device['mac'] }}</code>{{ mac_note(device['is_randomized_mac']) }}</dd>
 <dt>Validation personnelle</dt><dd><span class="badge">{{ statuses.get(device['status'], 'Non classé') }}</span></dd>
-<dt>Première observation</dt><dd>{{ local_time(device['first_seen']) }}</dd>
-<dt>Dernière observation</dt><dd>{{ local_time(device['last_seen']) }}</dd>
+<dt>Première observation enregistrée</dt><dd>{{ local_time(device['first_seen']) }}</dd>
+<dt>Dernière observation enregistrée</dt><dd>{{ local_time(device['last_seen']) }}</dd>
 </dl>
 <p class="note">Le fabricant réseau ne garantit ni la marque commerciale ni le modèle. Une validation personnelle n'est pas une authentification. Une observation ne prouve pas une présence actuelle.</p>
+{{ information_guide() }}
 {% if can_edit %}
 <section aria-labelledby="edit-title">
 <h2 id="edit-title">Modifier cet appareil</h2>
