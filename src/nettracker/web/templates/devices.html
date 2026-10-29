@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "device_information.html" import collection_summary, mac_note, information_guide %}
 {% block title %}Appareils · Home Network Tracker{% endblock %}
 {% block content %}
 {% set labels = {'known': 'Reconnu', 'unknown': 'À valider', 'to_confirm': 'À confirmer', 'ignored': 'Ignoré'} %}
@@ -11,24 +12,24 @@
 <div class="stat"><span class="note">À valider ou confirmer</span><strong>{{ (devices|selectattr('status', 'equalto', 'unknown')|list|length) + (devices|selectattr('status', 'equalto', 'to_confirm')|list|length) }}</strong></div>
 <div class="stat"><span class="note">Avec un résultat ICMP enregistré</span><strong>{{ devices|rejectattr('ping_online', 'equalto', none)|list|length }}</strong></div>
 </section>
-<div class="status-bar">
-<span class="badge {{ health_class }}">Collecteur : {{ health_label }}</span>
-<span class="badge {{ 'ok' if monitoring_enabled else 'warn' }}">Suivi configuré : {{ 'activé' if monitoring_enabled else 'désactivé' }}</span>
-</div>
-<p class="note">La configuration ne prouve pas que la boucle de suivi fonctionne actuellement.
-{% if health.last_success_at %}Dernier scan réussi : {{ health.last_success_at|paris_datetime }} (heure de Paris).{% else %}Aucun scan réussi enregistré.{% endif %}</p>
+<section aria-label="Fraîcheur des observations">
+{{ collection_summary(health) }}
+<p class="badge {{ 'ok' if monitoring_enabled else 'warn' }}">Suivi configuré : {{ 'activé' if monitoring_enabled else 'désactivé' }}</p>
+<p class="note">La configuration ne prouve pas que la boucle de suivi fonctionne actuellement. Sans nouvelle collecte réussie, les observations vieillissent, même si cette page reste ouverte.</p>
+</section>
+{{ information_guide() }}
 <div class="panel table-scroll" role="region" aria-label="Liste des appareils" tabindex="0">
 <table>
-<thead><tr><th scope="col">Appareil</th><th scope="col">Adresses</th><th scope="col">Fabricant réseau</th><th scope="col">Validation</th><th scope="col">Dernier résultat ICMP</th><th scope="col">Dernière observation</th></tr></thead>
+<thead><tr><th scope="col">Appareil</th><th scope="col">Adresses observées</th><th scope="col">Fabricant réseau (interface)</th><th scope="col">Validation personnelle</th><th scope="col">Dernier résultat ICMP enregistré</th><th scope="col">Dernière observation enregistrée</th></tr></thead>
 <tbody>
 {% for d in devices %}
 <tr>
 <td><a class="device-name" href="/devices/{{ d['id'] }}">{{ d['alias'] or d['hostname'] or ('Appareil n°' ~ d['id']) }}</a>{% if not d['alias'] and not d['hostname'] %}<span class="secondary note">Nom à renseigner</span>{% endif %}</td>
-<td>{{ d['ip'] or 'IP non renseignée' }}<code class="secondary">{{ d['mac'] }}</code>{% if d['is_randomized_mac'] %}<span class="secondary note">MAC privée / locale</span>{% endif %}</td>
+<td>{{ d['ip'] or 'IP non renseignée' }}<code class="secondary">{{ d['mac'] }}</code>{{ mac_note(d['is_randomized_mac']) }}</td>
 <td>{{ d['vendor'] or 'Non renseigné' }}</td>
 <td><span class="badge {{ 'ok' if d['status'] == 'known' else 'warn' if d['status'] in ['unknown', 'to_confirm'] else '' }}">{{ labels.get(d['status'], 'Non classé') }}</span></td>
 <td>{% if d['ping_online'] is none %}<span class="note">Pas encore mesuré</span>{% elif d['ping_online'] %}<span class="badge ok">Réponse reçue</span>{% else %}<span class="badge warn">Sans réponse</span>{% endif %}</td>
-<td>{{ d['last_seen']|paris_datetime }}<span class="secondary note">Heure de Paris</span></td>
+<td>{{ d['last_seen']|paris_datetime }}<span class="secondary note">Heure de Paris — pas une preuve de présence actuelle</span></td>
 </tr>
 {% else %}
 <tr><td class="empty" colspan="6">Aucun appareil enregistré. Lancez une découverte locale pour alimenter cette liste.</td></tr>

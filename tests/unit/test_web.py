@@ -91,9 +91,9 @@ def test_events_page_shows_the_notification_status(tmp_path: Path) -> None:
 
 
 def test_collector_health_is_ok_then_stale(tmp_path: Path) -> None:
-    assert "Collecteur : OK" in make_client(tmp_path).get("/").text
+    assert "Découverte : collecte récente" in make_client(tmp_path).get("/").text
     later = NOW + timedelta(hours=2)
-    assert "Collecteur : périmé" in make_client(tmp_path, now=later).get("/").text
+    assert "Découverte : à actualiser" in make_client(tmp_path, now=later).get("/").text
 
 
 def test_security_headers_and_no_documentation_endpoints(tmp_path: Path) -> None:
