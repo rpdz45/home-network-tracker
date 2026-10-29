@@ -16,6 +16,8 @@ from pydantic import SecretStr
 
 from nettracker.routers.bbox import BboxError, _origin
 
+__all__ = ["BboxError", "BboxHost", "BboxSnapshot", "read_authenticated_snapshot"]
+
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 MAX_HOSTS = 512
 ALLOWED_CALLS = frozenset(
@@ -58,7 +60,7 @@ def _text(value: object, sensitive: tuple[str, ...]) -> str | None:
 
 def _flag(value: object) -> bool | None:
     if type(value) is bool:
-        return cast(bool, value)
+        return value
     if type(value) is int and value in {0, 1}:
         return bool(value)
     return None
@@ -194,7 +196,7 @@ def read_authenticated_snapshot(
             cookie_header = client.build_request("GET", origin + "/api/v1/device").headers.get(
                 "cookie", ""
             )
-            cookies: SimpleCookie[str] = SimpleCookie()
+            cookies: SimpleCookie = SimpleCookie()
             try:
                 cookies.load(cookie_header)
             except CookieError:
