@@ -41,10 +41,14 @@ def render_list(
         "ping_online": None,
         "last_seen": STAMP,
     }
-    return environment().get_template("devices.html").render(
-        devices=[device],
-        health={"last_success_at": last, "age_seconds": age, "stale": stale},
-        monitoring_enabled=False,
+    return (
+        environment()
+        .get_template("devices.html")
+        .render(
+            devices=[device],
+            health={"last_success_at": last, "age_seconds": age, "stale": stale},
+            monitoring_enabled=False,
+        )
     )
 
 
@@ -112,8 +116,10 @@ def test_untrusted_names_are_still_escaped() -> None:
 
 
 def test_partial_legacy_context_does_not_invent_freshness() -> None:
-    text = environment().get_template("devices.html").render(
-        devices=[], health={"last_success_at": STAMP}, monitoring_enabled=False
+    text = (
+        environment()
+        .get_template("devices.html")
+        .render(devices=[], health={"last_success_at": STAMP}, monitoring_enabled=False)
     )
     assert "Découverte : ancienneté inconnue" in text
     assert "Découverte : collecte récente" not in text
@@ -142,14 +148,18 @@ def test_detail_preserves_edit_form_and_explains_identity() -> None:
         "buckets": [],
         "ratio": None,
     }
-    text = environment().get_template("device.html").render(
-        device=device,
-        can_edit=True,
-        csrf="synthetic-csrf",
-        device_types=["computer"],
-        series=series,
-        sightings=[],
-        events=[],
+    text = (
+        environment()
+        .get_template("device.html")
+        .render(
+            device=device,
+            can_edit=True,
+            csrf="synthetic-csrf",
+            device_types=["computer"],
+            series=series,
+            sightings=[],
+            events=[],
+        )
     )
     assert "&lt;img" in text
     assert "<img src=x" not in text
