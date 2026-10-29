@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Identification Fing · Home Network Tracker{% endblock %}
+{% block content %}
+<p><a href="/">Retour aux appareils</a></p>
+<h1>Identification fournie par Fing</h1>
+<p>Vue complémentaire : noms, marques, modèles et catégories réellement retournés par Fing. Reconnaissance non vérifiée indépendamment.</p>
+{% if not enabled %}<p>Lecture Fing désactivée par défaut.</p>{% endif %}
+{% if not has_key %}<p>Clé API Fing locale absente ou invalide côté serveur.</p>{% endif %}
+{% if not has_token %}<p>Configurer un jeton de connexion au dashboard pour cette lecture.</p>{% endif %}
+{% if can_read %}
+<form method="post" action="/identification/fing/read">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<p><label><input type="checkbox" name="confirm" value="yes" required> J'ai configuré Fing et vérifié ses paramètres de confidentialité. J'autorise la lecture de son API locale et le rapprochement avec mon inventaire.</label></p>
+<button type="submit">Lire les identifications Fing</button>
+</form>
+<p class="note">Aucune clé dans le formulaire. Attendre 60 secondes entre tentatives. Notre connecteur ne demande aucun nouveau scan ; Fing peut collecter de son côté.</p>
+{% endif %}
+{% if error %}<p role="alert">Lecture ou rapprochement impossible. Vérifiez localement la base initialisée, Fing actif, sa clé API et les éventuelles associations ambiguës. Aucun résultat n'a été enregistré.</p>{% endif %}
+{% if loaded %}
+<p>Données récupérées le {{ retrieved_at|paris_datetime }} (heure de Paris). Ce n'est pas la date du dernier scan ni une preuve de présence actuelle.</p>
+<p>{{ rows|length }} appareil(s) admissible(s), {{ excluded }} écarté(s) sans IPv4 dans le périmètre. Le rapprochement utilise les 500 fiches non fusionnées les plus récemment observées au maximum.</p>
+<div class="panel table-scroll"><table>
+<caption>Source : API locale Fing. Les champs absents restent « Non identifié ».</caption>
+<thead><tr><th scope="col">Fiche locale / ton nom</th><th scope="col">Nom selon Fing</th><th scope="col">Fabricant selon Fing</th><th scope="col">Modèle selon Fing</th><th scope="col">Catégorie selon Fing</th><th scope="col">Adresses</th><th scope="col">État et rapprochement</th></tr></thead>
+<tbody>{% for row in rows %}<tr>
+<td>{% if row.local_id is not none %}<a href="/devices/{{ row.local_id }}">Appareil n°{{ row.local_id }}</a><span class="secondary">{{ row.local_name }}</span>{% else %}Aucune fiche liée{% endif %}</td>
+<td>{{ row.name }}</td><td>{{ row.manufacturer }}</td><td>{{ row.model }}</td><td>{{ row.device_type }}</td>
+<td>{% for ip in row.addresses %}<code class="secondary">{{ ip }}</code>{% endfor %}<code class="secondary">{{ row.mac }}</code></td>
+<td>{{ row.state }}<span class="secondary">{{ row.association }}</span></td>
+</tr>{% else %}<tr><td colspan="7">Aucun appareil admissible retourné.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+<p class="note">Aucune modification d'alias, de fabricant enregistré, de confiance ou de règles réseau. Pas de persistance de ces résultats dans SQLite. Le mode local sans administration Bbox reste disponible.</p>
+{% endblock %}
