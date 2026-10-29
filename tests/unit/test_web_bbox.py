@@ -73,9 +73,7 @@ def test_default_is_inert() -> None:
 
 
 @pytest.mark.parametrize("missing", VARIABLES[:2] + VARIABLES[3:5])
-def test_missing_configuration_blocks_login(
-    monkeypatch: pytest.MonkeyPatch, missing: str
-) -> None:
+def test_missing_configuration_blocks_login(monkeypatch: pytest.MonkeyPatch, missing: str) -> None:
     activate(monkeypatch)
     monkeypatch.delenv(missing)
     with make_client() as client:
@@ -200,9 +198,7 @@ def test_media_type_size_and_duplicates(monkeypatch: pytest.MonkeyPatch) -> None
     with make_client() as client:
         assert client.post("/routers/bbox/read", json={}).status_code == 415
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        response = client.post(
-            "/routers/bbox/read", content="x=" + "a" * 2048, headers=headers
-        )
+        response = client.post("/routers/bbox/read", content="x=" + "a" * 2048, headers=headers)
         assert response.status_code == 413
         response = client.post("/routers/bbox/read", content="csrf=x&csrf=y", headers=headers)
         assert response.status_code == 422
