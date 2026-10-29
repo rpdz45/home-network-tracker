@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Bbox · Home Network Tracker{% endblock %}
+{% block content %}
+<p><a href="/routers">Retour aux routeurs</a></p>
+<h1>Bbox — inventaire administrateur</h1>
+<p>Connexion et lecture uniquement. Blocage/déblocage non implémentés ; compatibilité WiFi 7 XT non certifiée.</p>
+{% if not enabled %}<p class="badge warn">Lecture désactivée par défaut</p>{% endif %}
+{% if invalid_address %}<p role="alert">Adresse Bbox invalide ou hors du périmètre autorisé.</p>{% endif %}
+{% if address %}<p>Cible : <code>{{ address }}</code></p>{% else %}<p>Adresse cible absente ou invalide.</p>{% endif %}
+{% if not has_token %}<p>Configurer un jeton du dashboard.</p>{% endif %}
+{% if not has_password %}<p>Accès administrateur Bbox non configuré côté serveur.</p>{% endif %}
+{% if not has_model %}<p>Modèle API exact attendu absent ou invalide.</p>{% endif %}
+{% if allow_http %}<p role="alert" class="badge warn">HTTP autorisé : mot de passe, cookie et échanges non chiffrés.</p>{% endif %}
+{% if can_read %}
+<form method="post" action="/routers/bbox/read">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<p><label><input type="checkbox" name="confirm" value="yes" required> J'autorise l'envoi du mot de passe administrateur à cette cible, la lecture du modèle et des appareils, puis une tentative de déconnexion.</label></p>
+<button type="submit">Se connecter et lire les appareils Bbox</button>
+</form>
+<p>Secret chargé côté serveur. Modèle vérifié après connexion, pas avant. Attendre 15 minutes entre tentatives, même en cas d'échec.</p>
+{% endif %}
+{% if error %}<p role="alert">Lecture Bbox impossible. Vérifiez localement cible, identifiants, modèle attendu et TLS. Ne répétez pas immédiatement. La fermeture d'une session éventuelle n'est pas garantie.</p>{% endif %}
+{% if loaded %}
+<p>Modèle : {{ model }}. Firmware : {{ firmware }}. {{ rows|length }} appareil(s).</p>
+{% if session_closed %}<p>Demande de déconnexion acceptée ; révocation non vérifiée indépendamment.</p>{% else %}<p role="alert">Déconnexion non confirmée : la session peut subsister jusqu'à expiration.</p>{% endif %}
+<div class="panel table-scroll"><table>
+<caption>Appareils communiqués par la Bbox, sans preuve d'accès ou de coupure Internet</caption>
+<thead><tr><th scope="col">Nom</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">Présence</th></tr></thead>
+<tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td><code>{{ row.ip }}</code></td><td><code>{{ row.mac }}</code></td><td>{{ row.state }}</td></tr>{% else %}<tr><td colspan="4">Aucun appareil retourné.</td></tr>{% endfor %}</tbody>
+</table></div>
+{% endif %}
+<p class="note">Champs inconnus : « Non renseigné ». Aucun appel au simple affichage, rafraîchissement automatique, stockage SQLite ou changement des règles d'accès.</p>
+{% endblock %}
