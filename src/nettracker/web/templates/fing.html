@@ -15,7 +15,11 @@
 </form>
 <p class="note">Aucune clé dans le formulaire. Attendre 60 secondes entre tentatives. Notre connecteur ne demande aucun nouveau scan ; Fing peut collecter de son côté.</p>
 {% endif %}
-{% if error %}<p role="alert">Lecture ou rapprochement impossible. Vérifiez localement la base initialisée, Fing actif, sa clé API et les éventuelles associations ambiguës. Aucun résultat n'a été enregistré.</p>{% endif %}
+{% if error %}<p role="alert">Lecture, rapprochement ou stockage impossible. Vérifiez localement la base migrée, Fing et sa configuration. Pour réessayer le stockage, refaites une lecture. Aucun détail technique privé n'est affiché.</p>{% endif %}
+{% if summary is not none %}
+<p role="status">Stockage terminé : {{ summary.stored }} identification(s) enregistrée(s), {{ summary.unchanged }} inchangée(s), {{ summary.unmatched }} sans correspondance actuelle.</p>
+<p>Les alias, statuts de confiance et observations sont conservés. Aucun nouveau scan n'a été demandé.</p>
+{% endif %}
 {% if loaded %}
 <p>Données récupérées le {{ retrieved_at|paris_datetime }} (heure de Paris). Ce n'est pas la date du dernier scan ni une preuve de présence actuelle.</p>
 <p>{{ rows|length }} appareil(s) admissible(s), {{ excluded }} écarté(s) sans IPv4 dans le périmètre. Le rapprochement utilise les 500 fiches non fusionnées les plus récemment observées au maximum.</p>
@@ -29,6 +33,15 @@
 <td>{{ row.state }}<span class="secondary">{{ row.association }}</span></td>
 </tr>{% else %}<tr><td colspan="7">Aucun appareil admissible retourné.</td></tr>{% endfor %}</tbody>
 </table></div>
+{% if preview_token %}
+<form method="post" action="/identification/fing/store">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="preview" value="{{ preview_token }}">
+<p><label><input type="checkbox" name="confirm" value="yes" required> J'autorise la conservation locale de ces identifications déclarées par Fing, sans validation indépendante.</label></p>
+<button type="submit">Enregistrer les correspondances dans SQLite</button>
+</form>
+<p class="note">Aperçu à usage unique, valable au plus dix minutes. Une nouvelle lecture remplace l'aperçu précédent, y compris dans un autre onglet. Les correspondances MAC/IP sont revérifiées au stockage.</p>
 {% endif %}
-<p class="note">Aucune modification d'alias, de fabricant enregistré, de confiance ou de règles réseau. Pas de persistance de ces résultats dans SQLite. Le mode local sans administration Bbox reste disponible.</p>
+{% endif %}
+<p class="note">Aucune modification d'alias, de fabricant d'interface, de confiance ou de règles réseau. Les identifications ne sont conservées dans SQLite qu'après confirmation distincte. Le mode local sans administration Bbox reste disponible.</p>
 {% endblock %}
