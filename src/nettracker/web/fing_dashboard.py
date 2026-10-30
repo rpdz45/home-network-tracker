@@ -1,4 +1,4 @@
-"""Explicit Fing identification view; never overwrite local device identities."""
+"""Explicit Fing previews and confirmed local storage; no automatic identity edits."""
 
 import os
 import secrets
@@ -16,9 +16,11 @@ from pydantic import SecretStr
 from starlette.concurrency import run_in_threadpool
 
 from nettracker.config import Settings
+from nettracker.db.identifications import IdentificationError, ImportSummary, save_fing_inventory
 from nettracker.discovery import fing
-from nettracker.errors import NetTrackerError
+from nettracker.errors import DatabaseError, NetTrackerError
 from nettracker.web import queries
+from nettracker.web.fing_preview import FingPreviewStore
 
 MAX_FORM_BYTES = 2048
 COOLDOWN_SECONDS = 60
@@ -94,10 +96,56 @@ def _load_rows(settings: Settings) -> list[sqlite3.Row]:
         return queries.list_devices(connection)
 
 
+async def _confirmed_form(
+    request: Request, csrf: str, fields: set[str]
+) -> dict[str, list[str]]:
+    origin = request.headers.get("origin")
+    if origin is not None and origin != str(request.base_url).rstrip("/"):
+        raise HTTPException(status_code=403, detail="Origine refusée")
+    if request.headers.get("sec-fetch-site") == "cross-site":
+        raise HTTPException(status_code=403, detail="Origine refusée")
+    media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if media_type != "application/x-www-form-urlencoded":
+        raise HTTPException(status_code=415, detail="Formulaire attendu")
+    body = bytearray()
+    async for chunk in request.stream():
+        if len(body) + len(chunk) > MAX_FORM_BYTES:
+            raise HTTPException(status_code=413, detail="Requête trop volumineuse")
+        body.extend(chunk)
+    try:
+        form = parse_qs(
+            body.decode("utf-8"), keep_blank_values=True, strict_parsing=True,
+            max_num_fields=len(fields),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Formulaire invalide") from exc
+    if set(form) != fields or any(len(values) != 1 for values in form.values()):
+        raise HTTPException(status_code=422, detail="Champs invalides")
+    if not secrets.compare_digest(csrf.encode(), form["csrf"][0].encode()):
+        raise HTTPException(status_code=403, detail="Protection CSRF invalide")
+    if form["confirm"] != ["yes"]:
+        raise HTTPException(status_code=422, detail="Confirmation requise")
+    return form
+
+
+def _store(settings: Settings, inventory: fing.FingInventory) -> ImportSummary:
+    # Verify the published schema without creating or migrating a database.
+    with closing(queries.open_readonly(settings.database_path)):
+        pass
+    try:
+        uri = settings.database_path.resolve().as_uri() + "?mode=rw"
+        with closing(sqlite3.connect(uri, uri=True, timeout=5.0, isolation_level=None)) as conn:
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            return save_fing_inventory(conn, inventory, settings.allowed_subnets, confirmed=True)
+    except sqlite3.Error:
+        raise DatabaseError("identification storage failed") from None
+
+
 def install_fing_dashboard(
     protected: APIRouter, settings: Settings, templates: Jinja2Templates
 ) -> None:
-    """Install on the existing authenticated router; only confirmed POST reads Fing."""
+    """Install on the authenticated router; reading and storing need separate consent."""
     enabled = os.environ.get("NETTRACKER_FING_ENABLED") == "true"
     api_key = SecretStr(os.environ.get("NETTRACKER_FING_API_KEY", ""))
     has_key = 1 <= len(api_key.get_secret_value()) <= 4096
@@ -105,6 +153,7 @@ def install_fing_dashboard(
     can_read = enabled and has_key and has_token
     csrf = secrets.token_hex(32)
     lock = Lock()
+    previews = FingPreviewStore()
     last_attempt: float | None = None
 
     def load() -> tuple[fing.FingInventory, tuple[FingRow, ...]]:
@@ -119,26 +168,23 @@ def install_fing_dashboard(
         *,
         inventory: fing.FingInventory | None = None,
         rows: tuple[FingRow, ...] = (),
+        preview_token: str = "",
+        summary: ImportSummary | None = None,
         error: bool = False,
         status_code: int = 200,
     ) -> Response:
         return templates.TemplateResponse(
-            request,
-            "fing.html",
+            request, "fing.html",
             {
-                "enabled": enabled,
-                "has_key": has_key,
-                "has_token": has_token,
-                "can_read": can_read,
-                "csrf": csrf if has_token else "",
+                "enabled": enabled, "has_key": has_key, "has_token": has_token,
+                "can_read": can_read, "csrf": csrf if has_token else "",
                 "loaded": inventory is not None,
                 "retrieved_at": inventory.retrieved_at.isoformat() if inventory else "",
                 "excluded": inventory.excluded_devices if inventory else 0,
-                "rows": rows,
-                "error": error,
+                "rows": rows, "error": error, "preview_token": preview_token,
+                "summary": summary,
             },
-            status_code=status_code,
-            headers={"Cache-Control": "no-store"},
+            status_code=status_code, headers={"Cache-Control": "no-store"},
         )
 
     @protected.get("/identification/fing", response_class=HTMLResponse)
@@ -150,44 +196,43 @@ def install_fing_dashboard(
         nonlocal last_attempt
         if not can_read:
             raise HTTPException(status_code=403, detail="Lecture Fing non configurée")
-        origin = request.headers.get("origin")
-        if origin is not None and origin != str(request.base_url).rstrip("/"):
-            raise HTTPException(status_code=403, detail="Origine refusée")
-        if request.headers.get("sec-fetch-site") == "cross-site":
-            raise HTTPException(status_code=403, detail="Origine refusée")
-        media_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
-        if media_type != "application/x-www-form-urlencoded":
-            raise HTTPException(status_code=415, detail="Formulaire attendu")
-        body = bytearray()
-        async for chunk in request.stream():
-            if len(body) + len(chunk) > MAX_FORM_BYTES:
-                raise HTTPException(status_code=413, detail="Requête trop volumineuse")
-            body.extend(chunk)
-        try:
-            form = parse_qs(
-                body.decode("utf-8"), keep_blank_values=True, strict_parsing=True, max_num_fields=2
-            )
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail="Formulaire invalide") from exc
-        if set(form) != {"csrf", "confirm"} or any(len(values) != 1 for values in form.values()):
-            raise HTTPException(status_code=422, detail="Champs invalides")
-        if not secrets.compare_digest(csrf.encode(), form["csrf"][0].encode()):
-            raise HTTPException(status_code=403, detail="Protection CSRF invalide")
-        if form["confirm"] != ["yes"]:
-            raise HTTPException(status_code=422, detail="Confirmation requise")
+        await _confirmed_form(request, csrf, {"csrf", "confirm"})
         if not lock.acquire(blocking=False):
-            raise HTTPException(status_code=429, detail="Lecture déjà en cours")
+            raise HTTPException(status_code=429, detail="Opération Fing déjà en cours")
         try:
             now = monotonic()
             if last_attempt is not None and now - last_attempt < COOLDOWN_SECONDS:
                 raise HTTPException(status_code=429, detail="Attendre 60 secondes entre lectures")
             last_attempt = now
+            previews.clear()
             try:
                 inventory, rows = await run_in_threadpool(load)
             except NetTrackerError:
                 return render(request, error=True, status_code=503)
             finally:
                 last_attempt = monotonic()
-            return render(request, inventory=inventory, rows=rows)
+            token = previews.replace(inventory)
+            return render(request, inventory=inventory, rows=rows, preview_token=token)
+        finally:
+            lock.release()
+
+    @protected.post("/identification/fing/store", response_class=HTMLResponse)
+    async def store_fing(request: Request) -> Response:
+        if not can_read:
+            raise HTTPException(status_code=403, detail="Stockage Fing non configuré")
+        form = await _confirmed_form(request, csrf, {"csrf", "confirm", "preview"})
+        if not lock.acquire(blocking=False):
+            raise HTTPException(status_code=429, detail="Opération Fing déjà en cours")
+        try:
+            try:
+                inventory = previews.consume(form["preview"][0])
+                summary = await run_in_threadpool(_store, settings, inventory)
+            except IdentificationError:
+                raise HTTPException(
+                    status_code=409, detail="Aperçu invalide ou expiré : refaire une lecture"
+                ) from None
+            except NetTrackerError:
+                return render(request, error=True, status_code=503)
+            return render(request, summary=summary)
         finally:
             lock.release()
