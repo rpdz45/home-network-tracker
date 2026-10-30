@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from nettracker.cli import main
 from nettracker.config import MonitorSettings, Settings
-from nettracker.db import connect, migrate
+from nettracker.db import LATEST_VERSION, connect, migrate
 from nettracker.db.monitoring import MonitoringRepository
 from nettracker.discovery.scope import ScopeError
 from nettracker.errors import ConfigError, DatabaseError
@@ -280,10 +280,10 @@ def test_migrate_v1_preserves_discovery(tmp_path: Path) -> None:
         _apply(conn, 1, _V1)
         repo = MonitoringRepository(conn)
         device = seed(repo)
-        assert migrate(conn) == 2
+        assert migrate(conn) == LATEST_VERSION
         assert repo.target(device).ip == IP
         assert conn.execute("SELECT source FROM sightings").fetchone()[0] == "discovery"
-        assert migrate(conn) == 2
+        assert migrate(conn) == LATEST_VERSION
     finally:
         conn.close()
 
