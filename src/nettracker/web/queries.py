@@ -20,7 +20,16 @@ _DEVICES_SQL = (
     "(SELECT m.online FROM monitor_state m WHERE m.device_id = d.id) AS ping_online "
     "FROM devices d WHERE d.merged_into IS NULL ORDER BY d.last_seen DESC, d.id DESC LIMIT ?"
 )
-_DEVICE_SQL = "SELECT * FROM devices WHERE id = ?"
+_DEVICE_SQL = (
+    "SELECT d.*, i.source AS fing_source, i.reported_name AS fing_name, "
+    "i.manufacturer AS fing_manufacturer, i.model AS fing_model, "
+    "i.device_type AS fing_type, i.retrieved_at AS fing_retrieved_at, "
+    "i.stored_at AS fing_stored_at, i.matched_ip AS fing_matched_ip "
+    "FROM devices d LEFT JOIN device_identifications i "
+    "ON i.device_id = d.id AND i.source = 'fing_local_api' "
+    "AND i.matched_mac = d.mac AND d.merged_into IS NULL "
+    "WHERE d.id = ?"
+)
 _SIGHTINGS_SQL = (
     "SELECT source, ip, online, latency_ms, packet_loss_pct, seen_at FROM sightings "
     "WHERE device_id = ? ORDER BY seen_at DESC, id DESC LIMIT ?"
@@ -65,6 +74,7 @@ def list_devices(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 
 
 def get_device(conn: sqlite3.Connection, device_id: int) -> sqlite3.Row | None:
+    """Read a device and its historical Fing report without refreshing any data."""
     rows = _all(conn, _DEVICE_SQL, (device_id,))
     return rows[0] if rows else None
 
