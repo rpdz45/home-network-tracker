@@ -96,9 +96,7 @@ def _load_rows(settings: Settings) -> list[sqlite3.Row]:
         return queries.list_devices(connection)
 
 
-async def _confirmed_form(
-    request: Request, csrf: str, fields: set[str]
-) -> dict[str, list[str]]:
+async def _confirmed_form(request: Request, csrf: str, fields: set[str]) -> dict[str, list[str]]:
     origin = request.headers.get("origin")
     if origin is not None and origin != str(request.base_url).rstrip("/"):
         raise HTTPException(status_code=403, detail="Origine refusée")
@@ -114,7 +112,9 @@ async def _confirmed_form(
         body.extend(chunk)
     try:
         form = parse_qs(
-            body.decode("utf-8"), keep_blank_values=True, strict_parsing=True,
+            body.decode("utf-8"),
+            keep_blank_values=True,
+            strict_parsing=True,
             max_num_fields=len(fields),
         )
     except ValueError as exc:
@@ -174,17 +174,24 @@ def install_fing_dashboard(
         status_code: int = 200,
     ) -> Response:
         return templates.TemplateResponse(
-            request, "fing.html",
+            request,
+            "fing.html",
             {
-                "enabled": enabled, "has_key": has_key, "has_token": has_token,
-                "can_read": can_read, "csrf": csrf if has_token else "",
+                "enabled": enabled,
+                "has_key": has_key,
+                "has_token": has_token,
+                "can_read": can_read,
+                "csrf": csrf if has_token else "",
                 "loaded": inventory is not None,
                 "retrieved_at": inventory.retrieved_at.isoformat() if inventory else "",
                 "excluded": inventory.excluded_devices if inventory else 0,
-                "rows": rows, "error": error, "preview_token": preview_token,
+                "rows": rows,
+                "error": error,
+                "preview_token": preview_token,
                 "summary": summary,
             },
-            status_code=status_code, headers={"Cache-Control": "no-store"},
+            status_code=status_code,
+            headers={"Cache-Control": "no-store"},
         )
 
     @protected.get("/identification/fing", response_class=HTMLResponse)
