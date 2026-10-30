@@ -88,7 +88,27 @@ _V2: tuple[str, ...] = (
     """,
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2)
+_V3: tuple[str, ...] = (
+    """
+    CREATE TABLE device_identifications (
+        device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        source TEXT NOT NULL CHECK (source = 'fing_local_api'),
+        network_id TEXT NOT NULL CHECK (length(network_id) BETWEEN 1 AND 128),
+        matched_mac TEXT NOT NULL,
+        matched_ip TEXT NOT NULL,
+        reported_name TEXT CHECK (reported_name IS NULL OR length(reported_name) <= 128),
+        manufacturer TEXT CHECK (manufacturer IS NULL OR length(manufacturer) <= 128),
+        model TEXT CHECK (model IS NULL OR length(model) <= 128),
+        device_type TEXT CHECK (device_type IS NULL OR length(device_type) <= 128),
+        retrieved_at TEXT NOT NULL,
+        stored_at TEXT NOT NULL,
+        verification TEXT NOT NULL DEFAULT 'reported' CHECK (verification = 'reported'),
+        PRIMARY KEY (device_id, source)
+    )
+    """,
+)
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3)
 LATEST_VERSION = len(MIGRATIONS)
 
 
