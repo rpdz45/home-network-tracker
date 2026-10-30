@@ -27,11 +27,13 @@ def field(html: str, name: str) -> str:
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("NETTRACKER_FING_ENABLED", "true")
     monkeypatch.setenv("NETTRACKER_FING_API_KEY", "synthetic-api-key")
-    settings = Settings.model_validate({
-        "allowed_subnets": ["192.168.1.0/24"],
-        "database_path": str(tmp_path / "storage.db"),
-        "api": {"token": "synthetic-dashboard-token"},
-    })
+    settings = Settings.model_validate(
+        {
+            "allowed_subnets": ["192.168.1.0/24"],
+            "database_path": str(tmp_path / "storage.db"),
+            "api": {"token": "synthetic-dashboard-token"},
+        }
+    )
     with closing(connect(settings.database_path)) as conn:
         migrate(conn)
         repo = Repository(conn)
@@ -43,13 +45,16 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     def read(*args: object, **kwargs: object) -> fing.FingInventory:
         assert isinstance(args[0], SecretStr)
         return fing.FingInventory(
-            "synthetic-network", datetime.now(UTC),
+            "synthetic-network",
+            datetime.now(UTC),
             (fing.FingDevice(MAC, ("192.168.1.10",), "Test", "Brand", "Model", "PC", "UP"),),
             0,
         )
 
     monkeypatch.setattr(fing, "read_inventory", read)
-    return TestClient(create_app(settings), headers={"Authorization": "Bearer synthetic-dashboard-token"})
+    return TestClient(
+        create_app(settings), headers={"Authorization": "Bearer synthetic-dashboard-token"}
+    )
 
 
 def preview(client: TestClient) -> dict[str, str]:
@@ -90,12 +95,17 @@ def test_confirmed_store_is_local_and_cannot_be_replayed(
     ],
 )
 def test_invalid_store_changes_nothing(
-    client: TestClient, tmp_path: Path, change: dict[str, str],
-    headers: dict[str, str], status: int,
+    client: TestClient,
+    tmp_path: Path,
+    change: dict[str, str],
+    headers: dict[str, str],
+    status: int,
 ) -> None:
     data = preview(client)
     data.update(change)
-    assert client.post("/identification/fing/store", data=data, headers=headers).status_code == status
+    assert (
+        client.post("/identification/fing/store", data=data, headers=headers).status_code == status
+    )
     with closing(connect(tmp_path / "storage.db")) as conn:
         assert conn.execute("SELECT COUNT(*) FROM device_identifications").fetchone()[0] == 0
 
@@ -103,12 +113,17 @@ def test_invalid_store_changes_nothing(
 def test_store_requires_dashboard_authentication(client: TestClient) -> None:
     data = preview(client)
     client.headers.pop("Authorization")
-    assert client.post("/identification/fing/store", data=data, follow_redirects=False).status_code == 303
+    assert (
+        client.post("/identification/fing/store", data=data, follow_redirects=False).status_code
+        == 303
+    )
 
 
 def test_old_api_result_is_refused(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     def old(*args: object, **kwargs: object) -> fing.FingInventory:
-        return fing.FingInventory("synthetic-network", datetime.now(UTC) - timedelta(minutes=11), (), 0)
+        return fing.FingInventory(
+            "synthetic-network", datetime.now(UTC) - timedelta(minutes=11), (), 0
+        )
 
     monkeypatch.setattr(fing, "read_inventory", old)
     assert client.post("/identification/fing/store", data=preview(client)).status_code == 409
