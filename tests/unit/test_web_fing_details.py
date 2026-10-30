@@ -111,7 +111,5 @@ def test_no_report_for_merged_or_changed_identity(tmp_path: Path, change: str) -
             other = Repository(conn).upsert_device("02:00:00:00:00:02", seen_at=NOW)
             conn.execute("UPDATE devices SET merged_into = ? WHERE id = ?", (other.id, device_id))
         else:
-            conn.execute(
-                "UPDATE devices SET mac = '02:00:00:00:00:03' WHERE id = ?", (device_id,)
-            )
+            conn.execute("UPDATE devices SET mac = '02:00:00:00:00:03' WHERE id = ?", (device_id,))
     assert "Identification Fing enregistrée</h2>" not in page(path, device_id)
