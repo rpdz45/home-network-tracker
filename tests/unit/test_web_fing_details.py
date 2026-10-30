@@ -56,7 +56,9 @@ def page(path: Path, device_id: int) -> str:
         response = client.get(f"/devices/{device_id}")
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
-    return response.text
+    text = response.text
+    assert isinstance(text, str)
+    return text
 
 
 def snapshot(path: Path) -> tuple[str, ...]:
