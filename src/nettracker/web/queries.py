@@ -15,10 +15,15 @@ _VERSION_SQL = "SELECT MAX(version) FROM schema_version"
 _DEVICES_SQL = (
     "SELECT d.id, d.mac, d.alias, d.hostname, d.vendor, d.status, d.is_randomized_mac, "
     "d.first_seen, d.last_seen, "
+    "i.source AS fing_source, i.reported_name AS fing_name, "
+    "i.manufacturer AS fing_manufacturer, i.model AS fing_model, "
+    "i.retrieved_at AS fing_retrieved_at, "
     "(SELECT s.ip FROM sightings s WHERE s.device_id = d.id AND s.source = 'discovery' "
     "ORDER BY s.seen_at DESC, s.id DESC LIMIT 1) AS ip, "
     "(SELECT m.online FROM monitor_state m WHERE m.device_id = d.id) AS ping_online "
-    "FROM devices d WHERE d.merged_into IS NULL ORDER BY d.last_seen DESC, d.id DESC LIMIT ?"
+    "FROM devices d LEFT JOIN device_identifications i "
+    "ON i.device_id = d.id AND i.source = 'fing_local_api' AND i.matched_mac = d.mac "
+    "WHERE d.merged_into IS NULL ORDER BY d.last_seen DESC, d.id DESC LIMIT ?"
 )
 _DEVICE_SQL = (
     "SELECT d.*, i.source AS fing_source, i.reported_name AS fing_name, "
@@ -69,7 +74,7 @@ def _all(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> li
 
 
 def list_devices(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    """Unmerged devices, most recently seen first."""
+    """Unmerged devices and matching stored Fing reports, without network access."""
     return _all(conn, _DEVICES_SQL, (DEVICE_LIMIT,))
 
 
