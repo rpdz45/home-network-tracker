@@ -34,12 +34,12 @@ comme une autorisation suffisante pour envoyer une commande.
 
 ## Source technique étudiée
 
-LiveboxMonitor, `src/LiveboxMonitor/api/LmDeviceApi.py`, blob
-`4bf8ce93889105b27293d78e0d78fd5eb50ea1f2` :
-https://github.com/p-dor/LiveboxMonitor/blob/4bf8ce93889105b27293d78e0d78fd5eb50ea1f2/src/LiveboxMonitor/api/LmDeviceApi.py
+LiveboxMonitor, `src/LiveboxMonitor/api/LmDeviceApi.py` :
+https://github.com/p-dor/LiveboxMonitor/blob/main/src/LiveboxMonitor/api/LmDeviceApi.py
 
-Le SHA ci-dessus est un identifiant de blob consulté, pas un commit.
-Chemin navigable : https://github.com/p-dor/LiveboxMonitor/blob/main/src/LiveboxMonitor/api/LmDeviceApi.py
+Identifiant du blob consulté : `4bf8ce93889105b27293d78e0d78fd5eb50ea1f2`.
+Cet identifiant n'est pas un commit ; le lien de branche ci-dessus est
+navigable mais son contenu peut évoluer.
 
 Les méthodes de ce projet communautaire constituent une piste technique,
 pas une garantie constructeur ni une validation sur la Livebox du propriétaire.
