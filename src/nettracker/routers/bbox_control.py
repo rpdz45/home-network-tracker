@@ -38,7 +38,9 @@ def _target(snapshot: BboxSnapshot, request: AccessRequest) -> BboxHost:
         or host.address != str(request.address)
         or host.active is not True
         or type(host.blocked) is not bool
-        or any(other.identifier != host.identifier and other.address == host.address for other in hosts)
+        or any(
+            other.identifier != host.identifier and other.address == host.address for other in hosts
+        )
     ):
         raise AccessControlError("Bbox target identity or rule state is unverified")
     return host
