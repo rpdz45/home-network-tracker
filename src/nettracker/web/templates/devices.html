@@ -23,21 +23,22 @@
 <thead><tr><th scope="col">Appareil</th><th scope="col">Adresses observées</th><th scope="col">Marque et modèle déclarés (Fing)</th><th scope="col">Fabricant réseau (interface)</th><th scope="col">Validation personnelle</th><th scope="col">Dernier résultat ICMP enregistré</th><th scope="col">Dernière observation enregistrée</th></tr></thead>
 <tbody>
 {% for d in devices %}
+{% set fing_name = d['fing_name']|default(none) %}
 <tr>
 <td>
-<a class="device-name" href="/devices/{{ d['id'] }}">{{ d['alias'] or d['hostname'] or d['fing_name'] or ('Appareil n°' ~ d['id']) }}</a>
+<a class="device-name" href="/devices/{{ d['id'] }}">{{ d['alias'] or d['hostname'] or fing_name or ('Appareil n°' ~ d['id']) }}</a>
 {% if d['alias'] %}<span class="secondary note">Alias personnel</span>{% endif %}
 {% if d['hostname'] %}<span class="secondary note">Nom réseau : {{ d['hostname'] }}</span>{% endif %}
-{% if not d['alias'] and not d['hostname'] and not d['fing_name'] %}<span class="secondary note">Nom à renseigner</span>{% endif %}
+{% if not d['alias'] and not d['hostname'] and not fing_name %}<span class="secondary note">Nom à renseigner</span>{% endif %}
 </td>
 <td>{{ d['ip'] or 'IP non renseignée' }}<code class="secondary">{{ d['mac'] }}</code>{{ mac_note(d['is_randomized_mac']) }}</td>
 <td>
-{% if d['fing_source'] %}
-<span class="secondary">Marque / fabricant déclaré : {{ d['fing_manufacturer'] or 'Non identifié' }}</span>
-<span class="secondary">Modèle : {{ d['fing_model'] or 'Non identifié' }}</span>
-<span class="secondary">Nom déclaré : {{ d['fing_name'] or 'Non identifié' }}</span>
+{% if d['fing_source']|default(none) %}
+<span class="secondary">Marque / fabricant déclaré : {{ d['fing_manufacturer']|default(none) or 'Non identifié' }}</span>
+<span class="secondary">Modèle : {{ d['fing_model']|default(none) or 'Non identifié' }}</span>
+<span class="secondary">Nom déclaré : {{ fing_name or 'Non identifié' }}</span>
 <span class="secondary note">Source : Fing — déclaration historique, non vérifiée indépendamment</span>
-<span class="secondary note">Récupération API : {{ d['fing_retrieved_at']|paris_datetime }}</span>
+<span class="secondary note">Récupération API : {{ d['fing_retrieved_at']|default(none)|paris_datetime }}</span>
 {% else %}
 <span class="note">Aucune identification enregistrée</span>
 {% endif %}
