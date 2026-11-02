@@ -99,6 +99,4 @@ def build_bbox_control(
             raise AccessControlError("Bbox session suppressed an error; outcome is uncertain")
         return result
 
-    return ControlGuards(
-        resolve, execute, config.networks, protected, enabled=config.enabled
-    )
+    return ControlGuards(resolve, execute, config.networks, protected, enabled=config.enabled)
