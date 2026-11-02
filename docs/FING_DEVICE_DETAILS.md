@@ -10,8 +10,8 @@ Consulter la fiche ne contacte pas Fing, ne déclenche aucun scan et ne rafraîc
 
 Aucune nouvelle migration n'est ajoutée. Le schéma V3 existant doit déjà avoir été appliqué explicitement. Voir [le parcours de stockage](FING_STORAGE_DASHBOARD.md).
 
-## Validation prévue
+## Validation
 
-`pytest tests/unit/test_web_fing_details.py tests/unit/test_device_information.py tests/unit/test_web.py`, puis l'ensemble de la CI. Les nouveaux tests utilisent SQLite, des déclarations synthétiques et un lecteur Fing interdit ; ils couvrent l'affichage, les champs absents, l'échappement, la fusion, la MAC modifiée et l'absence de modification des données sur une lecture.
+`pytest tests/unit/test_web_fing_details.py tests/unit/test_device_information.py tests/unit/test_history_charts.py tests/unit/test_web.py`, puis l'ensemble de la CI. Les tests utilisent SQLite, des déclarations synthétiques et un lecteur Fing interdit ; ils couvrent l'affichage, les champs absents, l'échappement, la fusion, la MAC modifiée et l'absence de modification des données sur une lecture.
 
-Tests rédigés, non exécutés lors de la préparation de ce commit. Pas de validation sur navigateur réel, LAN, Fing réel ou base Windows du propriétaire. Les liens depuis README, SECURITY et TESTING restent à compléter dans cette branche avant finalisation.
+La CI (qualité Linux et Windows, gitleaks) a réussi sur la PR #56, qui a livré cet affichage. Pas de validation sur navigateur réel, LAN, Fing réel ou base Windows du propriétaire. Voir [TESTING.md](TESTING.md) et [SECURITY.md](SECURITY.md).
