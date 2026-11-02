@@ -207,7 +207,8 @@ class TimeSeriesTests(unittest.TestCase):
         self.assertIn("Téléphone", text)
         self.assertIn("À valider", text)
         self.assertIn(">19:00 · 25/10/2026</time>", text)
-        self.assertIn("Non disponible à ce stade", text)
+        self.assertIn("Aucune identification Fing enregistrée pour cette fiche.", text)
+        self.assertNotIn('id="fing-report-title"', text)
 
     def test_detail_distinguishes_discovery_from_ping(self) -> None:
         text = self.render_device()
