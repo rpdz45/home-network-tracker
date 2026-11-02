@@ -15,13 +15,29 @@
 <dt>Nom réseau annoncé</dt><dd>{{ device['hostname'] or 'Non renseigné' }}</dd>
 <dt>Type renseigné</dt><dd>{{ types.get(device['device_type'], 'Non renseigné') }}</dd>
 <dt>Fabricant réseau (interface)</dt><dd>{{ device['vendor'] or 'Non renseigné' }}</dd>
-<dt>Modèle</dt><dd>Non disponible à ce stade dans la fiche locale. <a href="/identification/fing">Consulter les modèles fournis par Fing (optionnel)</a>.</dd>
+<dt>Modèle selon Fing</dt><dd>{% if device['fing_source'] is defined and device['fing_source'] %}{{ device['fing_model'] or 'Non identifié' }} (déclaration enregistrée, non vérifiée){% else %}Aucune identification Fing enregistrée pour cette fiche.{% endif %} <a href="/identification/fing">Consulter les modèles fournis par Fing (optionnel)</a>.</dd>
 <dt>Adresse MAC</dt><dd><code>{{ device['mac'] }}</code>{{ mac_note(device['is_randomized_mac']) }}</dd>
 <dt>Validation personnelle</dt><dd><span class="badge">{{ statuses.get(device['status'], 'Non classé') }}</span></dd>
 <dt>Première observation enregistrée</dt><dd>{{ local_time(device['first_seen']) }}</dd>
 <dt>Dernière observation enregistrée</dt><dd>{{ local_time(device['last_seen']) }}</dd>
 </dl>
 <p class="note">Le fabricant réseau ne garantit ni la marque commerciale ni le modèle. Une validation personnelle n'est pas une authentification. Une observation ne prouve pas une présence actuelle.</p>
+{% if device['fing_source'] is defined and device['fing_source'] %}
+<section aria-labelledby="fing-report-title">
+<h2 id="fing-report-title">Identification Fing enregistrée</h2>
+<dl>
+<dt>Source</dt><dd>API locale Fing · déclaration non vérifiée indépendamment</dd>
+<dt>Nom déclaré par Fing</dt><dd>{{ device['fing_name'] or 'Non identifié' }}</dd>
+<dt>Fabricant déclaré par Fing</dt><dd>{{ device['fing_manufacturer'] or 'Non identifié' }}</dd>
+<dt>Modèle déclaré par Fing</dt><dd>{{ device['fing_model'] or 'Non identifié' }}</dd>
+<dt>Catégorie déclarée par Fing</dt><dd>{{ device['fing_type'] or 'Non identifié' }}</dd>
+<dt>Récupération API · Paris</dt><dd>{{ local_time(device['fing_retrieved_at']) }}</dd>
+<dt>Enregistrement local · Paris</dt><dd>{{ local_time(device['fing_stored_at']) }}</dd>
+<dt>IPv4 au rapprochement enregistré</dt><dd><code>{{ device['fing_matched_ip'] }}</code></dd>
+</dl>
+<p class="note">Données historiques : ni preuve de présence actuelle, ni date du dernier scan. L'IP affichée est celle du rapprochement au stockage, pas une garantie de l'IP actuelle. Cette lecture ne contacte pas Fing et ne rafraîchit pas l'identification.</p>
+</section>
+{% endif %}
 {{ information_guide() }}
 {% if can_edit %}
 <section aria-labelledby="edit-title">
