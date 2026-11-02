@@ -1,6 +1,7 @@
 """Livebox form tests use simulated readers and synthetic credentials only."""
 
 import re
+import secrets
 from pathlib import Path
 
 import pytest
@@ -11,15 +12,17 @@ from nettracker.config import Settings
 from nettracker.routers import livebox5
 from nettracker.web.app import create_app
 
-TOKEN = "dashboard-fixture-token"
-PASSWORD = "synthetic-livebox-password"
+TOKEN = secrets.token_urlsafe(24)
+PASSWORD = secrets.token_urlsafe(24)
 
 
 @pytest.fixture(autouse=True)
 def isolate(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in (
-        "NETTRACKER_LIVEBOX5_ENABLED", "NETTRACKER_LIVEBOX5_URL",
-        "NETTRACKER_LIVEBOX5_PASSWORD", "NETTRACKER_LIVEBOX5_ALLOW_HTTP",
+        "NETTRACKER_LIVEBOX5_ENABLED",
+        "NETTRACKER_LIVEBOX5_URL",
+        "NETTRACKER_LIVEBOX5_PASSWORD",
+        "NETTRACKER_LIVEBOX5_ALLOW_HTTP",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -30,11 +33,13 @@ def isolate(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def client_for(tmp_path: Path, *, token: bool = True) -> TestClient:
-    settings = Settings.model_validate({
-        "allowed_subnets": ["192.168.1.0/24"],
-        "database_path": str(tmp_path / "unused.db"),
-        "api": {"token": TOKEN} if token else {},
-    })
+    settings = Settings.model_validate(
+        {
+            "allowed_subnets": ["192.168.1.0/24"],
+            "database_path": str(tmp_path / "unused.db"),
+            "api": {"token": TOKEN} if token else {},
+        }
+    )
     client = TestClient(create_app(settings))
     if token:
         client.headers["Authorization"] = f"Bearer {TOKEN}"
@@ -108,8 +113,13 @@ def test_authentication_required(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
 @pytest.mark.parametrize(
     ("change", "status"),
-    [({"csrf": "incorrect"}, 403), ({"confirm": "no"}, 422),
-     ({"username": "other"}, 422), ({"password": ""}, 422), ({"extra": "x"}, 422)],
+    [
+        ({"csrf": "incorrect"}, 403),
+        ({"confirm": "no"}, 422),
+        ({"username": "other"}, 422),
+        ({"password": ""}, 422),
+        ({"extra": "x"}, 422),
+    ],
 )
 def test_invalid_forms_never_read(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change: dict[str, str], status: int
@@ -121,13 +131,17 @@ def test_invalid_forms_never_read(
         assert client.post("/routers/livebox/read", data=data).status_code == status
 
 
-@pytest.mark.parametrize("headers", [{"Origin": "https://invalid.example"}, {"Sec-Fetch-Site": "cross-site"}])
+@pytest.mark.parametrize(
+    "headers",
+    [{"Origin": "https://invalid.example"}, {"Sec-Fetch-Site": "cross-site"}],
+)
 def test_cross_site_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, headers: dict[str, str]
 ) -> None:
     enable(monkeypatch)
     with client_for(tmp_path) as client:
-        assert client.post("/routers/livebox/read", data=form(client), headers=headers).status_code == 403
+        response = client.post("/routers/livebox/read", data=form(client), headers=headers)
+        assert response.status_code == 403
 
 
 @pytest.mark.parametrize("legacy", [False, True])
@@ -145,7 +159,8 @@ def test_password_read_redaction_and_cooldown(
         calls.append(args[2].get_secret_value())
         assert kwargs == {"enabled": True, "allow_http": False}
         return livebox5.LiveboxSnapshot(
-            "Livebox 5", PASSWORD,
+            "Livebox 5",
+            PASSWORD,
             ({"Name": "<script>x</script>" + PASSWORD, "Active": True},),
         )
 
@@ -187,5 +202,11 @@ def test_media_size_and_duplicate_fields(tmp_path: Path, monkeypatch: pytest.Mon
     with client_for(tmp_path) as client:
         assert client.post("/routers/livebox/read", json={}).status_code == 415
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        assert client.post("/routers/livebox/read", content=b"x=" + b"a" * 4096, headers=headers).status_code == 413
-        assert client.post("/routers/livebox/read", content=b"csrf=x&confirm=yes&csrf=y", headers=headers).status_code == 422
+        oversized = client.post(
+            "/routers/livebox/read", content=b"x=" + b"a" * 4096, headers=headers
+        )
+        assert oversized.status_code == 413
+        duplicate = client.post(
+            "/routers/livebox/read", content=b"csrf=x&confirm=yes&csrf=y", headers=headers
+        )
+        assert duplicate.status_code == 422
