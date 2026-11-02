@@ -15,8 +15,9 @@ from starlette.concurrency import run_in_threadpool
 
 from nettracker.config import Settings
 from nettracker.routers import bbox, bbox_session
+from nettracker.web.router_credentials import CredentialFormError, parse_credentials
 
-MAX_FORM_BYTES = 2048
+MAX_FORM_BYTES = 4096
 COOLDOWN_SECONDS = 900
 
 
@@ -37,15 +38,15 @@ def _label(value: bool | None, positive: str, negative: str) -> str:
 def install_bbox_dashboard(
     protected: APIRouter, settings: Settings, templates: Jinja2Templates
 ) -> None:
-    """The caller supplies its authenticated router; GET never contacts the Bbox."""
+    """The authenticated caller supplies routes; GET never contacts the Bbox."""
     enabled = os.environ.get("NETTRACKER_BBOX_AUTH_ENABLED") == "true"
     allow_http = os.environ.get("NETTRACKER_BBOX_ALLOW_HTTP") == "true"
-    password = SecretStr(os.environ.get("NETTRACKER_BBOX_PASSWORD", ""))
+    configured_password = SecretStr(os.environ.get("NETTRACKER_BBOX_PASSWORD", ""))
     expected_model = os.environ.get("NETTRACKER_BBOX_EXPECTED_MODEL", "")
     raw_address = os.environ.get("NETTRACKER_BBOX_URL", "")
     raw_ca = os.environ.get("NETTRACKER_BBOX_CA_FILE", "")
     ca_file = Path(raw_ca) if raw_ca else None
-    has_password = bool(password.get_secret_value())
+    has_password = bool(configured_password.get_secret_value())
     has_model = 1 <= len(expected_model) <= 128
     has_token = settings.api.token is not None and bool(settings.api.token.get_secret_value())
     address = ""
@@ -55,7 +56,7 @@ def install_bbox_dashboard(
             address = bbox._origin(raw_address, settings.allowed_subnets, allow_http)
         except bbox.BboxError:
             invalid_address = True
-    can_read = enabled and bool(address) and has_token and has_password and has_model
+    can_read = enabled and bool(address) and has_token and has_model
     csrf = secrets.token_hex(32)
     lock = Lock()
     last_attempt: float | None = None
@@ -64,10 +65,10 @@ def install_bbox_dashboard(
         request: Request,
         *,
         snapshot: bbox_session.BboxSnapshot | None = None,
+        secret: str = "",
         error: bool = False,
         status_code: int = 200,
     ) -> Response:
-        secret = password.get_secret_value()
         rows: list[dict[str, str]] = []
         if snapshot:
             for host in snapshot.hosts:
@@ -100,7 +101,7 @@ def install_bbox_dashboard(
                 "error": error,
             },
             status_code=status_code,
-            headers={"Cache-Control": "no-store"},
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
         )
 
     @protected.get("/routers/bbox", response_class=HTMLResponse)
@@ -127,16 +128,34 @@ def install_bbox_dashboard(
             body.extend(chunk)
         try:
             form = parse_qs(
-                body.decode("utf-8"), keep_blank_values=True, strict_parsing=True, max_num_fields=2
+                body.decode("utf-8"),
+                keep_blank_values=True,
+                strict_parsing=True,
+                max_num_fields=4,
+                encoding="utf-8",
+                errors="strict",
             )
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail="Formulaire invalide") from exc
-        if set(form) != {"csrf", "confirm"} or any(len(values) != 1 for values in form.values()):
-            raise HTTPException(status_code=422, detail="Champs invalides")
-        if not secrets.compare_digest(csrf.encode(), form["csrf"][0].encode()):
+        except (ValueError, UnicodeError):
+            raise HTTPException(status_code=422, detail="Formulaire invalide") from None
+        password = configured_password
+        if set(form) == {"csrf", "confirm"}:
+            if any(len(values) != 1 for values in form.values()):
+                raise HTTPException(status_code=422, detail="Champs invalides")
+            submitted_csrf = form["csrf"][0]
+            if form["confirm"] != ["yes"] or not has_password:
+                raise HTTPException(status_code=422, detail="Confirmation et mot de passe requis")
+        else:
+            try:
+                submitted_csrf, credentials = parse_credentials(bytes(body))
+            except CredentialFormError:
+                raise HTTPException(status_code=422, detail="Identifiants invalides") from None
+            if credentials.username:
+                raise HTTPException(
+                    status_code=422, detail="Cette connexion Bbox utilise un mot de passe seul"
+                )
+            password = credentials.password
+        if not secrets.compare_digest(csrf.encode(), submitted_csrf.encode()):
             raise HTTPException(status_code=403, detail="Protection CSRF invalide")
-        if form["confirm"] != ["yes"]:
-            raise HTTPException(status_code=422, detail="Confirmation requise")
         if not lock.acquire(blocking=False):
             raise HTTPException(status_code=429, detail="Lecture déjà en cours")
         try:
@@ -160,6 +179,6 @@ def install_bbox_dashboard(
                 return render(request, error=True, status_code=503)
             finally:
                 last_attempt = monotonic()
-            return render(request, snapshot=snapshot)
+            return render(request, snapshot=snapshot, secret=password.get_secret_value())
         finally:
             lock.release()

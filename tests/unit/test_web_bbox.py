@@ -1,6 +1,7 @@
-"""Bbox dashboard tests use the real application and a simulated reader."""
+"""Bbox dashboard tests use a simulated reader and synthetic credentials."""
 
 import re
+import secrets
 from ipaddress import IPv4Network
 from pathlib import Path
 
@@ -13,8 +14,8 @@ from nettracker.routers import bbox, bbox_session
 from nettracker.web import bbox_dashboard
 from nettracker.web.app import create_app
 
-CREDENTIAL = "synthetic-dashboard-credential"
-ADMIN_FIXTURE = "fixture-not-a-real-bbox-password"
+CREDENTIAL = secrets.token_urlsafe(24)
+ADMIN_FIXTURE = secrets.token_urlsafe(24)
 ADDRESS = "https://192.168.1.254"
 MODEL = "synthetic-bbox-model"
 VARIABLES = (
@@ -72,7 +73,7 @@ def test_default_is_inert() -> None:
         assert client.post("/routers/bbox/read", data={}).status_code == 403
 
 
-@pytest.mark.parametrize("missing", VARIABLES[:2] + VARIABLES[3:5])
+@pytest.mark.parametrize("missing", [VARIABLES[0], VARIABLES[1], VARIABLES[4]])
 def test_missing_configuration_blocks_login(monkeypatch: pytest.MonkeyPatch, missing: str) -> None:
     activate(monkeypatch)
     monkeypatch.delenv(missing)
@@ -121,8 +122,13 @@ def test_forms_cannot_change_server_configuration(
         assert client.post("/routers/bbox/read", data=data).status_code == status
 
 
-def test_reader_parameters_escaping_and_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("submitted", [False, True])
+def test_reader_parameters_escaping_and_cooldown(
+    monkeypatch: pytest.MonkeyPatch, submitted: bool
+) -> None:
     activate(monkeypatch)
+    if submitted:
+        monkeypatch.delenv("NETTRACKER_BBOX_PASSWORD")
     calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
     clock = [1000.0]
     monkeypatch.setattr(bbox_dashboard, "monotonic", lambda: clock[0])
@@ -151,6 +157,8 @@ def test_reader_parameters_escaping_and_cooldown(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(bbox_session, "read_authenticated_snapshot", read)
     with make_client() as client:
         data = form(client)
+        if submitted:
+            data.update({"username": "", "password": ADMIN_FIXTURE})
         response = client.post("/routers/bbox/read", data=data)
         assert response.status_code == 200
         assert ADMIN_FIXTURE not in response.text
@@ -161,6 +169,7 @@ def test_reader_parameters_escaping_and_cooldown(monkeypatch: pytest.MonkeyPatch
         assert "Actif selon la box" in response.text
         assert "Déconnexion non confirmée" in response.text
         assert response.headers["Cache-Control"] == "no-store"
+        assert response.headers["Referrer-Policy"] == "no-referrer"
         assert calls[0][0][0] == ADDRESS
         assert calls[0][0][1] == [IPv4Network("192.168.1.0/24")]
         assert calls[0][0][3] == MODEL
@@ -177,7 +186,10 @@ def test_reader_parameters_escaping_and_cooldown(monkeypatch: pytest.MonkeyPatch
         assert len(calls) == 2
 
 
-def test_failure_redacts_and_consumes_cooldown(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("submitted", [False, True])
+def test_failure_redacts_and_consumes_cooldown(
+    monkeypatch: pytest.MonkeyPatch, submitted: bool
+) -> None:
     activate(monkeypatch)
 
     def fail(*args: object, **kwargs: object) -> bbox_session.BboxSnapshot:
@@ -186,6 +198,8 @@ def test_failure_redacts_and_consumes_cooldown(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(bbox_session, "read_authenticated_snapshot", fail)
     with make_client() as client:
         data = form(client)
+        if submitted:
+            data.update({"username": "", "password": ADMIN_FIXTURE})
         response = client.post("/routers/bbox/read", data=data)
         assert response.status_code == 503
         assert ADMIN_FIXTURE not in response.text
@@ -198,7 +212,7 @@ def test_media_type_size_and_duplicates(monkeypatch: pytest.MonkeyPatch) -> None
     with make_client() as client:
         assert client.post("/routers/bbox/read", json={}).status_code == 415
         headers = {"Content-Type": "application/x-www-form-urlencoded"}
-        response = client.post("/routers/bbox/read", content="x=" + "a" * 2048, headers=headers)
+        response = client.post("/routers/bbox/read", content="x=" + "a" * 4096, headers=headers)
         assert response.status_code == 413
         response = client.post("/routers/bbox/read", content="csrf=x&csrf=y", headers=headers)
         assert response.status_code == 422
@@ -232,3 +246,36 @@ def test_application_registers_bbox(tmp_path: Path) -> None:
         assert 'href="/routers/bbox"' in client.get("/routers").text
         assert client.get("/routers/bbox").headers["Cache-Control"] == "no-store"
     assert not (tmp_path / "absent.db").exists()
+
+
+def test_form_without_configured_password(monkeypatch: pytest.MonkeyPatch) -> None:
+    activate(monkeypatch)
+    monkeypatch.delenv("NETTRACKER_BBOX_PASSWORD")
+    with make_client() as client:
+        response = client.get("/routers/bbox")
+        assert 'type="password"' in response.text
+        assert 'name="username" value=""' in response.text
+        assert ADMIN_FIXTURE not in response.text
+        assert client.post("/routers/bbox/read", data=form(client)).status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("changes", "status"),
+    [
+        ({"username": "admin"}, 422),
+        ({"password": ""}, 422),
+        ({"csrf": "invalid"}, 403),
+        ({"confirm": "no"}, 422),
+        ({"address": "https://192.168.1.2"}, 422),
+        ({"expected_model": "other"}, 422),
+    ],
+)
+def test_submitted_credentials_guards(
+    monkeypatch: pytest.MonkeyPatch, changes: dict[str, str], status: int
+) -> None:
+    activate(monkeypatch)
+    with make_client() as client:
+        data = form(client)
+        data.update({"username": "", "password": ADMIN_FIXTURE})
+        data.update(changes)
+        assert client.post("/routers/bbox/read", data=data).status_code == status
