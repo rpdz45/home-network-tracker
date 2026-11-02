@@ -2,32 +2,42 @@
 {% block title %}Livebox 5 · Home Network Tracker{% endblock %}
 {% block content %}
 <p><a href="/routers">Retour aux routeurs</a></p>
-<h1>Livebox 5 — lecture administrateur</h1>
-<p class="lede">Cette lecture utilise l'administration de la box, pas seulement votre connexion au Wi-Fi.</p>
-<p>Blocage et déblocage indisponibles dans ce lot. Compatibilité du firmware non confirmée sur matériel réel.</p>
-{% if not enabled %}<p class="badge warn">Lecture désactivée par défaut</p>{% endif %}
-{% if invalid_address %}<p role="alert">Adresse Livebox invalide ou hors du périmètre autorisé.</p>{% endif %}
-{% if address %}<p>Cible configurée : <code>{{ address }}</code></p>{% else %}<p>Adresse cible absente ou invalide.</p>{% endif %}
-{% if not has_token %}<p>Configurer un jeton du dashboard pour autoriser la lecture.</p>{% endif %}
-{% if not has_password %}<p>Accès administrateur Livebox non configuré côté serveur.</p>{% endif %}
-{% if allow_http %}<p role="alert" class="badge warn">HTTP local autorisé : le mot de passe administrateur et les échanges ne sont pas chiffrés.</p>{% endif %}
+<h1>Livebox 5 — connexion et inventaire</h1>
+<p class="lede">Consulter les appareils avec votre accès administrateur Livebox.</p>
+<p>Lecture seule : blocage et déblocage indisponibles. Compatibilité non vérifiée sur votre box.</p>
+{% if not enabled %}<p class="badge warn">Lecture désactivée côté serveur.</p>{% endif %}
+{% if invalid_address %}<p role="alert">Adresse invalide ou hors du périmètre autorisé.</p>{% endif %}
+{% if address %}<p>Box ciblée : <code>{{ address }}</code></p>{% else %}<p>Configurer l'adresse de la Livebox côté serveur.</p>{% endif %}
+{% if not has_token %}<p>Un jeton de connexion au dashboard est obligatoire.</p>{% endif %}
+{% if allow_http %}<p role="alert" class="badge warn">Attention : HTTP autorisé vers la box. Le mot de passe et les échanges sur ce lien ne sont pas chiffrés.</p>{% endif %}
 {% if can_read %}
+<h2>Lire avec mon mot de passe</h2>
 <form method="post" action="/routers/livebox/read">
 <input type="hidden" name="csrf" value="{{ csrf }}">
-<p><label><input type="checkbox" name="confirm" value="yes" required> J'autorise l'identification, une connexion administrateur et la lecture des appareils de cette Livebox.</label></p>
-<button type="submit">Lire les appareils de la Livebox</button>
+<p><label>Identifiant <input name="username" value="admin" readonly autocomplete="username"></label></p>
+<p><label>Mot de passe de la Livebox <input type="password" name="password" required maxlength="256" autocomplete="off"></label></p>
+<p><label><input type="checkbox" name="confirm" value="yes" required> J'autorise la connexion administrateur et la lecture des appareils de cette box.</label></p>
+<button type="submit">Se connecter et lire les appareils</button>
 </form>
-<p class="note">Aucun mot de passe dans ce formulaire. Attendre 60 secondes entre tentatives. La session créée sur la box peut subsister jusqu'à expiration.</p>
+<p class="note">Le mot de passe saisi n'est ni enregistré par ce formulaire ni réaffiché. Il doit être ressaisi à chaque lecture. La session créée sur la box peut subsister jusqu'à expiration. Attendre 60 secondes entre tentatives.</p>
+{% if has_password %}
+<details><summary>Utiliser le mot de passe déjà configuré sur le serveur</summary>
+<form method="post" action="/routers/livebox/read">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<p><label><input type="checkbox" name="confirm" value="yes" required> J'autorise une connexion et une lecture avec l'accès configuré.</label></p>
+<button type="submit">Lire avec l'accès configuré</button>
+</form></details>
 {% endif %}
-{% if error %}<p role="alert" class="badge bad">Lecture Livebox impossible. Vérifiez la cible, l'accès administrateur et la confiance TLS. Aucun résultat n'est confirmé.</p>{% endif %}
+{% endif %}
+{% if error %}<p role="alert" class="badge bad">Lecture impossible. Vérifiez la cible, le mot de passe et la confiance TLS. Aucune connexion réussie n'est confirmée.</p>{% endif %}
 {% if loaded %}
-<p>{{ rows|length }} appareil(s) retourné(s) par la box. Firmware communiqué : {{ firmware }}.</p>
+<p>{{ rows|length }} appareil(s) communiqués par la box. Firmware : {{ firmware }}.</p>
 <div class="panel table-scroll"><table>
-<caption>Informations communiquées par la Livebox, sans garantie de modèle exact des appareils</caption>
-<thead><tr><th scope="col">Nom</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">État communiqué</th></tr></thead>
+<caption>Inventaire Livebox : les modèles exacts ne sont pas garantis</caption>
+<thead><tr><th scope="col">Nom réseau</th><th scope="col">IP</th><th scope="col">MAC</th><th scope="col">État communiqué</th></tr></thead>
 <tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td><code>{{ row.ip }}</code></td><td><code>{{ row.mac }}</code></td><td>{{ row.state }}</td></tr>{% else %}<tr><td colspan="4">Aucun appareil retourné.</td></tr>{% endfor %}</tbody>
 </table></div>
-<p class="note">Les champs absents ou non reconnus restent « Non renseigné ». Aucun résultat n'est ajouté à SQLite.</p>
+<p>Les données manquantes restent « Non renseigné ». Aucun alias n'est remplacé et aucun résultat n'est stocké dans SQLite.</p>
 {% endif %}
-<p class="note">Aucune lecture au simple affichage, aucun rafraîchissement automatique et aucune modification des règles d'accès.</p>
+<p class="note">Aucun accès à la box à l'ouverture de la page, aucun rafraîchissement automatique.</p>
 {% endblock %}

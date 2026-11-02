@@ -1,4 +1,4 @@
-"""Explicit administrator-backed Livebox reads; never change router access rules."""
+"""Explicit administrator-backed Livebox reads; never change access rules."""
 
 import os
 import secrets
@@ -15,16 +15,16 @@ from starlette.concurrency import run_in_threadpool
 
 from nettracker.config import Settings
 from nettracker.routers import livebox5
+from nettracker.web.router_credentials import CredentialFormError, parse_credentials
 
-MAX_FORM_BYTES = 2048
+MAX_FORM_BYTES = 4096
 COOLDOWN_SECONDS = 60
 
 
 def _safe_text(value: object, secret: str) -> str:
     if not isinstance(value, str) or not value:
         return "Non renseigné"
-    text = value.replace(secret, "[masqué]") if secret else value
-    return text[:120]
+    return (value.replace(secret, "[masqué]") if secret else value)[:120]
 
 
 def _device_rows(devices: tuple[dict[str, Any], ...], secret: str) -> list[dict[str, str]]:
@@ -50,19 +50,20 @@ def _device_rows(devices: tuple[dict[str, Any], ...], secret: str) -> list[dict[
 def install_livebox_dashboard(
     protected: APIRouter, settings: Settings, templates: Jinja2Templates
 ) -> None:
-    """Use only the caller's authenticated router and the existing read-only client."""
+    """Install read-only forms; credentials are never persisted by these routes."""
     enabled = os.environ.get("NETTRACKER_LIVEBOX5_ENABLED") == "true"
     allow_http = os.environ.get("NETTRACKER_LIVEBOX5_ALLOW_HTTP") == "true"
-    raw_address = os.environ.get("NETTRACKER_LIVEBOX5_URL", "")
-    password = SecretStr(os.environ.get("NETTRACKER_LIVEBOX5_PASSWORD", ""))
-    has_password = bool(password.get_secret_value())
+    configured_password = SecretStr(os.environ.get("NETTRACKER_LIVEBOX5_PASSWORD", ""))
+    has_password = bool(configured_password.get_secret_value())
     has_token = settings.api.token is not None and bool(settings.api.token.get_secret_value())
     address = ""
     invalid_address = False
+    raw_address = os.environ.get("NETTRACKER_LIVEBOX5_URL", "")
     if raw_address:
         try:
-            endpoint = livebox5._endpoint(raw_address, settings.allowed_subnets, allow_http)
-            address = endpoint.removesuffix("/ws")
+            address = livebox5._endpoint(
+                raw_address, settings.allowed_subnets, allow_http
+            ).removesuffix("/ws")
         except livebox5.LiveboxError:
             invalid_address = True
     csrf = secrets.token_hex(32)
@@ -73,10 +74,10 @@ def install_livebox_dashboard(
         request: Request,
         *,
         snapshot: livebox5.LiveboxSnapshot | None = None,
+        secret: str = "",
         error: bool = False,
         status_code: int = 200,
     ) -> Response:
-        secret = password.get_secret_value()
         return templates.TemplateResponse(
             request,
             "livebox.html",
@@ -87,7 +88,7 @@ def install_livebox_dashboard(
                 "allow_http": allow_http,
                 "has_token": has_token,
                 "has_password": has_password,
-                "can_read": enabled and bool(address) and has_token and has_password,
+                "can_read": enabled and bool(address) and has_token,
                 "csrf": csrf if has_token else "",
                 "loaded": snapshot is not None,
                 "firmware": _safe_text(snapshot.firmware, secret) if snapshot else "",
@@ -95,6 +96,7 @@ def install_livebox_dashboard(
                 "error": error,
             },
             status_code=status_code,
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
         )
 
     @protected.get("/routers/livebox", response_class=HTMLResponse)
@@ -104,7 +106,7 @@ def install_livebox_dashboard(
     @protected.post("/routers/livebox/read", response_class=HTMLResponse)
     async def read_livebox(request: Request) -> Response:
         nonlocal last_attempt
-        if not enabled or not address or not has_token or not has_password:
+        if not enabled or not address or not has_token:
             raise HTTPException(status_code=403, detail="Lecture Livebox non configurée")
         origin = request.headers.get("origin")
         if origin is not None and origin != str(request.base_url).rstrip("/"):
@@ -121,16 +123,32 @@ def install_livebox_dashboard(
             body.extend(chunk)
         try:
             form = parse_qs(
-                body.decode("utf-8"), keep_blank_values=True, strict_parsing=True, max_num_fields=2
+                body.decode("utf-8"),
+                keep_blank_values=True,
+                strict_parsing=True,
+                max_num_fields=4,
+                encoding="utf-8",
+                errors="strict",
             )
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail="Formulaire invalide") from exc
-        if set(form) != {"csrf", "confirm"} or any(len(values) != 1 for values in form.values()):
-            raise HTTPException(status_code=422, detail="Champs invalides")
-        if not secrets.compare_digest(csrf.encode(), form["csrf"][0].encode()):
+        except (ValueError, UnicodeError):
+            raise HTTPException(status_code=422, detail="Formulaire invalide") from None
+        password = configured_password
+        if set(form) == {"csrf", "confirm"}:
+            if any(len(values) != 1 for values in form.values()):
+                raise HTTPException(status_code=422, detail="Champs invalides")
+            submitted_csrf = form["csrf"][0]
+            if form["confirm"] != ["yes"] or not has_password:
+                raise HTTPException(status_code=422, detail="Confirmation et mot de passe requis")
+        else:
+            try:
+                submitted_csrf, credentials = parse_credentials(bytes(body))
+            except CredentialFormError:
+                raise HTTPException(status_code=422, detail="Identifiants invalides") from None
+            if credentials.username != "admin":
+                raise HTTPException(status_code=422, detail="Identifiant Livebox attendu : admin")
+            password = credentials.password
+        if not secrets.compare_digest(csrf.encode(), submitted_csrf.encode()):
             raise HTTPException(status_code=403, detail="Protection CSRF invalide")
-        if form["confirm"] != ["yes"]:
-            raise HTTPException(status_code=422, detail="Confirmation requise")
         if not lock.acquire(blocking=False):
             raise HTTPException(status_code=429, detail="Lecture déjà en cours")
         try:
@@ -149,6 +167,6 @@ def install_livebox_dashboard(
                 )
             except livebox5.LiveboxError:
                 return render(request, error=True, status_code=503)
-            return render(request, snapshot=snapshot)
+            return render(request, snapshot=snapshot, secret=password.get_secret_value())
         finally:
             lock.release()
