@@ -150,7 +150,9 @@ def install_bbox_dashboard(
             except CredentialFormError:
                 raise HTTPException(status_code=422, detail="Identifiants invalides") from None
             if credentials.username:
-                raise HTTPException(status_code=422, detail="Cette connexion Bbox utilise un mot de passe seul")
+                raise HTTPException(
+                    status_code=422, detail="Cette connexion Bbox utilise un mot de passe seul"
+                )
             password = credentials.password
         if not secrets.compare_digest(csrf.encode(), submitted_csrf.encode()):
             raise HTTPException(status_code=403, detail="Protection CSRF invalide")
