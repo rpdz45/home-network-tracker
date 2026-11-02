@@ -63,7 +63,9 @@ def page(path: Path) -> str:
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
     assert snapshot(path) == before
-    return response.text
+    text = response.text
+    assert isinstance(text, str)
+    return text
 
 
 def test_list_loads_stored_report_and_preserves_alias(tmp_path: Path) -> None:
