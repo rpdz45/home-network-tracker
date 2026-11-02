@@ -1,5 +1,6 @@
 """Tests for the read-only dashboard (in-process client, no real network)."""
 
+import re
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -53,6 +54,14 @@ def make_client(tmp_path: Path, credential: str | None = None, now: datetime = N
     settings = make_settings(tmp_path, credential)
     seed(settings.database_path)
     return TestClient(create_app(settings, clock=lambda: now))
+
+
+def login_csrf(client: TestClient) -> str:
+    page = client.get("/login")
+    assert page.status_code == 200
+    match = re.search(r'name="csrf" value="([a-f0-9]+)"', page.text)
+    assert match is not None
+    return match[1]
 
 
 def test_devices_page_lists_unmerged_devices(tmp_path: Path) -> None:
@@ -147,15 +156,20 @@ def test_a_bearer_credential_is_checked(tmp_path: Path) -> None:
 
 def test_login_sets_a_strict_http_only_cookie(tmp_path: Path) -> None:
     client = make_client(tmp_path, CREDENTIAL)
-    bad = client.post("/login", content="token=wrong", headers=FORM, follow_redirects=False)
+    csrf = login_csrf(client)
+    bad = client.post(
+        "/login", data={"csrf": csrf, "token": "wrong"}, follow_redirects=False
+    )
     assert bad.status_code == 401
     assert COOKIE_NAME not in bad.cookies
-    content = f"token={CREDENTIAL}"
-    good = client.post("/login", content=content, headers=FORM, follow_redirects=False)
+    good = client.post(
+        "/login", data={"csrf": csrf, "token": CREDENTIAL}, follow_redirects=False
+    )
     assert good.status_code == 303
     cookie = good.headers["set-cookie"].lower()
     assert "httponly" in cookie
     assert "samesite=strict" in cookie
+    assert client.cookies[COOKIE_NAME] != CREDENTIAL
     page = client.get("/")
     assert page.status_code == 200
     assert CREDENTIAL not in page.text
@@ -172,3 +186,32 @@ def test_login_is_not_needed_without_a_configured_credential(tmp_path: Path) -> 
     response = make_client(tmp_path).get("/login", follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/"
+
+
+def test_legacy_cookie_is_not_a_browser_session(tmp_path: Path) -> None:
+    client = make_client(tmp_path, CREDENTIAL)
+    client.cookies.set(COOKIE_NAME, CREDENTIAL)
+    assert client.get("/", follow_redirects=False).status_code == 303
+
+
+def test_logout_revokes_only_its_browser_session(tmp_path: Path) -> None:
+    settings = make_settings(tmp_path, CREDENTIAL)
+    seed(settings.database_path)
+    app = create_app(settings)
+    with TestClient(app) as first, TestClient(app) as second:
+        for client in (first, second):
+            response = client.post(
+                "/login", data={"csrf": login_csrf(client), "token": CREDENTIAL},
+                follow_redirects=False,
+            )
+            assert response.status_code == 303
+        old = first.cookies[COOKIE_NAME]
+        assert old != second.cookies[COOKIE_NAME]
+        page = first.get("/logout")
+        match = re.search(r'name="csrf" value="([a-f0-9]+)"', page.text)
+        assert match is not None
+        assert first.get("/").status_code == 200
+        assert first.post("/logout", data={"csrf": match[1]}, follow_redirects=False).status_code == 303
+        first.cookies.set(COOKIE_NAME, old)
+        assert first.get("/", follow_redirects=False).status_code == 303
+        assert second.get("/").status_code == 200

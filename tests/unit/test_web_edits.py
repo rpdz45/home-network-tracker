@@ -122,7 +122,10 @@ def test_body_limit_and_content_type(tmp_path: Path) -> None:
 def test_cookie_authenticated_form_and_empty_alias(tmp_path: Path) -> None:
     client = make_client(tmp_path)
     client.headers.pop("Authorization")
-    assert client.post("/login", data={"token": CREDENTIAL}).status_code == 200
+    page = client.get("/login")
+    match = re.search(r'name="csrf" value="([a-f0-9]+)"', page.text)
+    assert match is not None
+    assert client.post("/login", data={"csrf": match[1], "token": CREDENTIAL}).status_code == 200
     data = form(client)
     data["alias"] = ""
     data["device_type"] = ""
