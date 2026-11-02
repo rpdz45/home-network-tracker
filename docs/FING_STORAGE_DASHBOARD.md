@@ -7,7 +7,7 @@ La lecture Fing reste facultative. Le dashboard exige son jeton de connexion, NE
 1. Sauvegarder la base puis appliquer explicitement les migrations avec `nettracker init-db --config config.toml` avant de démarrer le dashboard. Les routes ne créent ni ne migrent la base.
 2. Ouvrir `/identification/fing`, confirmer la lecture et consulter les résultats.
 3. Cocher la confirmation de conservation locale, distincte de l'autorisation de lecture, puis sélectionner « Enregistrer les correspondances dans SQLite ».
-4. Lire le bilan : enregistrées, inchangées et sans correspondance actuelle. Ce bilan ne remplace pas l'affichage persistant sur la fiche appareil, hors de ce lot.
+4. Lire le bilan : enregistrées, inchangées et sans correspondance actuelle. Les identifications enregistrées sont ensuite visibles sur chaque fiche appareil concernée : voir [FING_DEVICE_DETAILS.md](FING_DEVICE_DETAILS.md).
 
 L'aperçu est conservé côté serveur : le navigateur envoie seulement un jeton opaque, un jeton CSRF et la confirmation. Les champs fabricant/modèle fournis par le navigateur sont refusés. L'aperçu est à usage unique et valable au plus dix minutes ; la date de récupération API est également vérifiée par la couche de stockage.
 
@@ -19,6 +19,6 @@ Après un échec de stockage, le jeton est consommé : refaire une lecture avant
 
 ## Validation
 
-Tests HTTP en processus avec inventaires synthétiques et lecteur Fing remplacé : stockage SQLite, refus de rejeu, authentification, CSRF, origine, confirmation, champs injectés et récupération périmée. Les tests de coffre couvrent expiration et consommation concurrente. Commandes : `pytest tests/unit/test_fing_preview.py tests/unit/test_web_fing_storage.py tests/unit/test_web_fing.py`, puis les contrôles complets de CI.
+Tests HTTP en processus avec inventaires synthétiques et lecteur Fing remplacé : stockage SQLite, refus de rejeu, authentification, CSRF, origine, confirmation, champs injectés et récupération périmée. Les tests de coffre couvrent expiration et consommation concurrente. Commandes : `pytest tests/unit/test_fing_preview.py tests/unit/test_web_fing_storage.py tests/unit/test_web_fing.py`, puis les contrôles complets de CI. Voir aussi [TESTING.md](TESTING.md).
 
-Ces tests sont ajoutés mais non exécutés au moment de la préparation de ce commit. Aucun test sur Fing réel, navigateur, matériel ou base Windows du propriétaire n'a été effectué. La CI complète et la revue restent obligatoires avant fusion.
+La CI (qualité Linux et Windows, gitleaks) a réussi sur les PR #55 et #56. Aucun test sur Fing réel, navigateur, matériel ou base Windows du propriétaire n'a été effectué ; une CI verte ne remplace pas ces essais.
