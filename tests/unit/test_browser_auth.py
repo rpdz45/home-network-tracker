@@ -40,6 +40,7 @@ def login(client: TestClient) -> str:
     assert "HttpOnly" in response.headers["set-cookie"]
     assert "SameSite=strict" in response.headers["set-cookie"]
     token = client.cookies[COOKIE_NAME]
+    assert isinstance(token, str)
     assert token != CREDENTIAL
     return token
 

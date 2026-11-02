@@ -18,7 +18,9 @@ MAX_AGE = 8 * 3600
 
 
 def _matches(expected: str, supplied: str | None) -> bool:
-    return bool(supplied) and secrets.compare_digest(expected.encode(), supplied.encode())
+    if not supplied:
+        return False
+    return secrets.compare_digest(expected.encode(), supplied.encode())
 
 
 async def _form(request: Request, fields: set[str]) -> dict[str, str]:
