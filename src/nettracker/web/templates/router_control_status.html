@@ -1,0 +1,21 @@
+<section class="panel" aria-labelledby="router-control-title" id="router-control-status">
+<h2 id="router-control-title">Contrôle d'accès des appareils</h2>
+<p class="badge warn">Écritures non raccordées au dashboard</p>
+<p>Les services préparatoires ne sont pas des commandes utilisables depuis cette page.</p>
+<div class="table-scroll"><table>
+<caption>Disponibilité du contrôle dans cette version du dashboard</caption>
+<thead><tr><th scope="col">Routeur</th><th scope="col">État</th><th scope="col">Actions</th></tr></thead>
+<tbody>
+<tr><th scope="row">Livebox 5</th>
+<td>Service et adaptateur développés ; raccordement web non activé. Compatibilité matérielle non validée ici.</td>
+<td><button type="button" disabled aria-describedby="livebox-control-reason">Bloquer — Livebox</button>
+<button type="button" disabled aria-describedby="livebox-control-reason">Retirer le forçage — Livebox</button>
+<p id="livebox-control-reason">Indisponible : aucune route de contrôle web raccordée. Le retrait d'un forçage ne garantit pas l'accès si le calendrier l'interdit.</p></td></tr>
+<tr><th scope="row">Bbox</th>
+<td>Service préparatoire avec adaptateur simulé ; adaptateur HTTP d'écriture non fourni.</td>
+<td><button type="button" disabled aria-describedby="bbox-control-reason">Bloquer — Bbox</button>
+<button type="button" disabled aria-describedby="bbox-control-reason">Débloquer — Bbox</button>
+<p id="bbox-control-reason">Indisponible : protocole d'écriture et préservation des règles à valider avant tout raccordement réel.</p></td></tr>
+</tbody></table></div>
+<p class="note">Les tests simulés ne prouvent pas la compatibilité avec une box réelle. Aucune simulation interactive n'est disponible sur cette page. Son affichage n'envoie aucune commande aux box.</p>
+</section>
