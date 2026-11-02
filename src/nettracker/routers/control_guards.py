@@ -94,9 +94,7 @@ class ControlGuards(Generic[Result]):
             }
             if len(self._pending) >= self._capacity:
                 raise AccessControlError("confirmation capacity reached")
-            pending = PendingControl(
-                secrets.token_urlsafe(32), device_id, request, now + self._ttl
-            )
+            pending = PendingControl(secrets.token_urlsafe(32), device_id, request, now + self._ttl)
             self._pending[pending.token] = _Entry(pending, session_id)
             return pending
         finally:
