@@ -8,7 +8,7 @@ import pytest
 from pydantic import SecretStr
 
 from nettracker.routers.control import AccessControlError, AccessRequest, RouterKind
-from nettracker.routers.livebox5_control import change_schedule
+from nettracker.routers.livebox5_control import ControlResult, change_schedule
 
 MAC = "02:00:00:00:00:01"
 NETWORKS = [IPv4Network("192.168.1.0/24")]
@@ -16,7 +16,7 @@ NETWORKS = [IPv4Network("192.168.1.0/24")]
 
 def run(
     transport: httpx.MockTransport, *, blocked: bool = True, confirmed: bool = True
-) -> object:
+) -> ControlResult:
     return change_schedule(
         "https://192.168.1.1",
         NETWORKS,
@@ -41,8 +41,11 @@ def test_one_write_and_readback_preserve_schedule(blocked: bool) -> None:
         payload = json.loads(request.content)
         method = payload["method"]
         calls.append(method)
+        reply: dict[str, object]
         if payload["service"] == "sysbus.DeviceInfo":
-            reply = {"status": {"ProductClass": "Livebox 5", "SoftwareVersion": "synthetic-firmware"}}
+            reply = {
+                "status": {"ProductClass": "Livebox 5", "SoftwareVersion": "synthetic-firmware"}
+            }
         elif method == "createContext":
             reply = {"data": {"contextID": "test-context"}}
         else:
@@ -65,7 +68,7 @@ def test_one_write_and_readback_preserve_schedule(blocked: bool) -> None:
         return httpx.Response(200, json=reply)
 
     result = run(httpx.MockTransport(handle), blocked=blocked)
-    assert getattr(result, "changed") is True
+    assert result.changed is True
     assert calls == ["get", "createContext", "getSchedule", "overrideSchedule", "getSchedule"]
 
 

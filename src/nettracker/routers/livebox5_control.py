@@ -11,7 +11,12 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import SecretStr
 
-from nettracker.routers.control import PRIVATE_NETWORKS, AccessControlError, AccessRequest, RouterKind
+from nettracker.routers.control import (
+    PRIVATE_NETWORKS,
+    AccessControlError,
+    AccessRequest,
+    RouterKind,
+)
 from nettracker.routers.livebox5 import LiveboxError, _endpoint, _post
 from nettracker.routers.livebox5_access import ScheduleState, override_parameters, parse_schedule
 
@@ -149,5 +154,7 @@ def change_schedule(
             if after.override != desired or (request.blocked and not after.blocked):
                 raise AccessControlError("read-back mismatch")
         except (AccessControlError, LiveboxError):
-            raise AccessControlError("change outcome is uncertain; do not retry automatically") from None
+            raise AccessControlError(
+                "change outcome is uncertain; do not retry automatically"
+            ) from None
         return ControlResult(True, after)
