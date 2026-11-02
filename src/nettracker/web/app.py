@@ -22,13 +22,14 @@ from nettracker.db.device_edits import DEVICE_TYPES, mark_known, update_identity
 from nettracker.db.health import CollectorHealth, collector_health
 from nettracker.errors import NetTrackerError
 from nettracker.web import queries
+from nettracker.web.browser_auth import COOKIE_NAME as COOKIE_NAME
+from nettracker.web.browser_auth import install_browser_auth
 from nettracker.web.formatting import paris_datetime
 from nettracker.web.router_dashboard import install_router_dashboard
 from nettracker.web.timeseries import load_series
 
 logger = logging.getLogger(__name__)
 
-COOKIE_NAME = "nettracker_session"
 COOKIE_MAX_AGE = 8 * 3600
 MAX_LOGIN_BYTES = 4096
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -99,12 +100,13 @@ def create_app(
     *,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> FastAPI:
-    """Build the dashboard; edits always require a configured credential, even on loopback."""
+    """Build the dashboard with opaque browser sessions and existing Bearer access."""
     expected = _expected_credential(settings)
     csrf_key = secrets.token_bytes(32)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["paris_datetime"] = paris_datetime
     app = FastAPI(title="Home Network Tracker", docs_url=None, redoc_url=None, openapi_url=None)
+    require_auth = install_browser_auth(app, expected)
 
     def csrf_for(device_id: int) -> str:
         return hmac.digest(csrf_key, str(device_id).encode(), "sha256").hex()
@@ -116,19 +118,6 @@ def create_app(
             yield conn
         finally:
             conn.close()
-
-    def require_auth(request: Request) -> None:
-        if expected is None:
-            return
-        header = request.headers.get("authorization")
-        if header is None:
-            if _matches(expected, request.cookies.get(COOKIE_NAME)):
-                return
-            raise HTTPException(status_code=303, headers={"Location": "/login"})
-        scheme, _, supplied = header.partition(" ")
-        if scheme.lower() == "bearer" and _matches(expected, supplied.strip()):
-            return
-        raise HTTPException(status_code=401, detail="unauthorized")
 
     @app.middleware("http")
     async def security_headers(
@@ -144,30 +133,6 @@ def create_app(
     async def database_unavailable(request: Request, exc: Exception) -> Response:
         logger.warning("dashboard request failed: %s", type(exc).__name__)
         return PlainTextResponse("Service indisponible : base de données non prête.", 503)
-
-    @app.get("/login", response_class=HTMLResponse)
-    def login_form(request: Request) -> Response:
-        if expected is None:
-            return RedirectResponse("/", status_code=303)
-        return templates.TemplateResponse(request, "login.html", {"error": False})
-
-    @app.post("/login")
-    async def login(request: Request) -> Response:
-        if expected is None:
-            return RedirectResponse("/", status_code=303)
-        body = await _read_limited(request, MAX_LOGIN_BYTES)
-        if body is None:
-            return PlainTextResponse("Requête trop volumineuse.", status_code=413)
-        form = parse_qs(body.decode("utf-8", errors="replace"))
-        if not _matches(expected, form.get("token", [""])[0]):
-            return templates.TemplateResponse(
-                request, "login.html", {"error": True}, status_code=401
-            )
-        response = RedirectResponse("/", status_code=303)
-        response.set_cookie(
-            COOKIE_NAME, expected, max_age=COOKIE_MAX_AGE, httponly=True, samesite="strict"
-        )
-        return response
 
     protected = APIRouter(dependencies=[Depends(require_auth)])
 

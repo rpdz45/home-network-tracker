@@ -1,5 +1,6 @@
 """HTTP history validation with real migrations and stored fixtures; no network probes."""
 
+import re
 import sqlite3
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -161,6 +162,12 @@ def test_empty_device_has_unknown_history(client: TestClient) -> None:
 
 def test_history_also_accepts_login_cookie(client: TestClient) -> None:
     client.headers.pop("Authorization")
-    response = client.post("/login", data={"token": CREDENTIAL}, follow_redirects=False)
+    page = client.get("/login")
+    assert page.status_code == 200
+    match = re.search(r'name="csrf" value="([a-f0-9]+)"', page.text)
+    assert match is not None
+    response = client.post(
+        "/login", data={"csrf": match[1], "token": CREDENTIAL}, follow_redirects=False
+    )
     assert response.status_code == 303
     assert client.get("/devices/1?window=7d").status_code == 200
