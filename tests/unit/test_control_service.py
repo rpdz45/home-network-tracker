@@ -121,9 +121,7 @@ def test_refusals_never_connect(tmp_path: Path, mode: str) -> None:
         config = replace(config, enabled=False)
     elif mode == "protected":
         config = replace(config, management_mac=MAC)
-    guard = build_livebox_control(
-        config, transport=httpx.MockTransport(forbidden), now=lambda: NOW
-    )
+    guard = build_livebox_control(config, transport=httpx.MockTransport(forbidden), now=lambda: NOW)
     with pytest.raises(AccessControlError):
         guard.prepare(device_id, True, session_id="owner")
     if mode == "missing":
