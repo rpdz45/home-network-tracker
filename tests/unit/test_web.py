@@ -211,7 +211,8 @@ def test_logout_revokes_only_its_browser_session(tmp_path: Path) -> None:
         match = re.search(r'name="csrf" value="([a-f0-9]+)"', page.text)
         assert match is not None
         assert first.get("/").status_code == 200
-        assert first.post("/logout", data={"csrf": match[1]}, follow_redirects=False).status_code == 303
+        response = first.post("/logout", data={"csrf": match[1]}, follow_redirects=False)
+        assert response.status_code == 303
         first.cookies.set(COOKIE_NAME, old)
         assert first.get("/", follow_redirects=False).status_code == 303
         assert second.get("/").status_code == 200

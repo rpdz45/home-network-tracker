@@ -72,7 +72,8 @@ def install_browser_auth(
         return HTMLResponse(
             '<!doctype html><html lang="fr"><meta charset="utf-8">'
             '<title>Session · Home Network Tracker</title><main>' + content + '</main></html>',
-            status_code=status, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+            status_code=status,
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
         )
 
     def browser_session(request: Request) -> str:
