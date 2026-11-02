@@ -73,7 +73,7 @@ def test_partial_report_keeps_unknown_values() -> None:
 )
 def test_name_priority(alias: str, hostname: str, expected: str) -> None:
     text = render({"alias": alias, "hostname": hostname, "fing_name": "Reported"})
-    assert f'>{expected}</a>' in text
+    assert f">{expected}</a>" in text
 
 
 def test_reported_fields_remain_escaped() -> None:
