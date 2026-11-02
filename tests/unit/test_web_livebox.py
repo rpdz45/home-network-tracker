@@ -82,9 +82,7 @@ def test_form_available_without_environment_password(
 
 
 @pytest.mark.parametrize("case", ["disabled", "missing-address", "outside-subnet", "http"])
-def test_configuration_guards(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str
-) -> None:
+def test_configuration_guards(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case: str) -> None:
     enable(monkeypatch)
     if case == "disabled":
         monkeypatch.delenv("NETTRACKER_LIVEBOX5_ENABLED")

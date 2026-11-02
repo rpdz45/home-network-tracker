@@ -36,12 +36,14 @@ def _device_rows(devices: tuple[dict[str, Any], ...], secret: str) -> list[dict[
             state = "Actif selon la box"
         elif active is False:
             state = "Inactif selon la box"
-        rows.append({
-            "name": _safe_text(device.get("Name"), secret),
-            "ip": _safe_text(device.get("IPAddress"), secret),
-            "mac": _safe_text(device.get("PhysAddress"), secret),
-            "state": state,
-        })
+        rows.append(
+            {
+                "name": _safe_text(device.get("Name"), secret),
+                "ip": _safe_text(device.get("IPAddress"), secret),
+                "mac": _safe_text(device.get("PhysAddress"), secret),
+                "state": state,
+            }
+        )
     return rows
 
 
@@ -80,9 +82,12 @@ def install_livebox_dashboard(
             request,
             "livebox.html",
             {
-                "enabled": enabled, "address": address,
-                "invalid_address": invalid_address, "allow_http": allow_http,
-                "has_token": has_token, "has_password": has_password,
+                "enabled": enabled,
+                "address": address,
+                "invalid_address": invalid_address,
+                "allow_http": allow_http,
+                "has_token": has_token,
+                "has_password": has_password,
                 "can_read": enabled and bool(address) and has_token,
                 "csrf": csrf if has_token else "",
                 "loaded": snapshot is not None,
@@ -118,8 +123,12 @@ def install_livebox_dashboard(
             body.extend(chunk)
         try:
             form = parse_qs(
-                body.decode("utf-8"), keep_blank_values=True, strict_parsing=True,
-                max_num_fields=4, encoding="utf-8", errors="strict",
+                body.decode("utf-8"),
+                keep_blank_values=True,
+                strict_parsing=True,
+                max_num_fields=4,
+                encoding="utf-8",
+                errors="strict",
             )
         except (ValueError, UnicodeError):
             raise HTTPException(status_code=422, detail="Formulaire invalide") from None
@@ -149,8 +158,12 @@ def install_livebox_dashboard(
             last_attempt = now
             try:
                 snapshot = await run_in_threadpool(
-                    livebox5.read_snapshot, address, settings.allowed_subnets, password,
-                    enabled=True, allow_http=allow_http,
+                    livebox5.read_snapshot,
+                    address,
+                    settings.allowed_subnets,
+                    password,
+                    enabled=True,
+                    allow_http=allow_http,
                 )
             except livebox5.LiveboxError:
                 return render(request, error=True, status_code=503)
