@@ -31,7 +31,8 @@ def test_logout_navigation_requires_a_browser_session(tmp_path: Path) -> None:
         match = re.search(r'name="csrf" value="([a-f0-9]+)"', login.text)
         assert match is not None
         response = client.post(
-            "/login", data={"csrf": match[1], "token": CREDENTIAL},
+            "/login",
+            data={"csrf": match[1], "token": CREDENTIAL},
             follow_redirects=False,
         )
         assert response.status_code == 303

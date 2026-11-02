@@ -157,14 +157,10 @@ def test_a_bearer_credential_is_checked(tmp_path: Path) -> None:
 def test_login_sets_a_strict_http_only_cookie(tmp_path: Path) -> None:
     client = make_client(tmp_path, CREDENTIAL)
     csrf = login_csrf(client)
-    bad = client.post(
-        "/login", data={"csrf": csrf, "token": "wrong"}, follow_redirects=False
-    )
+    bad = client.post("/login", data={"csrf": csrf, "token": "wrong"}, follow_redirects=False)
     assert bad.status_code == 401
     assert COOKIE_NAME not in bad.cookies
-    good = client.post(
-        "/login", data={"csrf": csrf, "token": CREDENTIAL}, follow_redirects=False
-    )
+    good = client.post("/login", data={"csrf": csrf, "token": CREDENTIAL}, follow_redirects=False)
     assert good.status_code == 303
     cookie = good.headers["set-cookie"].lower()
     assert "httponly" in cookie
@@ -201,7 +197,8 @@ def test_logout_revokes_only_its_browser_session(tmp_path: Path) -> None:
     with TestClient(app) as first, TestClient(app) as second:
         for client in (first, second):
             response = client.post(
-                "/login", data={"csrf": login_csrf(client), "token": CREDENTIAL},
+                "/login",
+                data={"csrf": login_csrf(client), "token": CREDENTIAL},
                 follow_redirects=False,
             )
             assert response.status_code == 303

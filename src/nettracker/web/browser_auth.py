@@ -37,8 +37,12 @@ async def _form(request: Request, fields: set[str]) -> dict[str, str]:
         body.extend(chunk)
     try:
         values = parse_qs(
-            body.decode("utf-8"), keep_blank_values=True, strict_parsing=True,
-            max_num_fields=len(fields), encoding="utf-8", errors="strict",
+            body.decode("utf-8"),
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=len(fields),
+            encoding="utf-8",
+            errors="strict",
         )
     except (ValueError, UnicodeError):
         raise HTTPException(422, "Formulaire invalide") from None
@@ -48,7 +52,10 @@ async def _form(request: Request, fields: set[str]) -> dict[str, str]:
 
 
 def install_browser_auth(
-    app: FastAPI, credential: str | None, *, sessions: SessionStore | None = None,
+    app: FastAPI,
+    credential: str | None,
+    *,
+    sessions: SessionStore | None = None,
 ) -> Callable[[Request], None]:
     """Install once, instead of legacy login routes; return the auth dependency.
 
@@ -64,14 +71,19 @@ def install_browser_auth(
 
     def cookie(response: Response, request: Request, name: str, value: str, age: int) -> None:
         response.set_cookie(
-            name, value, max_age=age, httponly=True, samesite="strict",
-            secure=request.url.scheme == "https", path="/",
+            name,
+            value,
+            max_age=age,
+            httponly=True,
+            samesite="strict",
+            secure=request.url.scheme == "https",
+            path="/",
         )
 
     def page(content: str, status: int = 200) -> HTMLResponse:
         return HTMLResponse(
             '<!doctype html><html lang="fr"><meta charset="utf-8">'
-            '<title>Session · Home Network Tracker</title><main>' + content + '</main></html>',
+            "<title>Session · Home Network Tracker</title><main>" + content + "</main></html>",
             status_code=status,
             headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
         )
