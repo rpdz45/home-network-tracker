@@ -66,7 +66,9 @@ def build_livebox_control(
                 max_age=config.max_age,
             )
         except sqlite3.Error:
-            raise AccessControlError("local inventory is unavailable; no change permitted") from None
+            raise AccessControlError(
+                "local inventory is unavailable; no change permitted"
+            ) from None
         finally:
             if conn is not None:
                 conn.close()

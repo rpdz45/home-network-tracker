@@ -87,7 +87,9 @@ def test_confirmed_inventory_target_reaches_adapter_once(tmp_path: Path) -> None
             },
         )
 
-    guard = build_livebox_control(settings(path), transport=httpx.MockTransport(handle), now=lambda: NOW)
+    guard = build_livebox_control(
+        settings(path), transport=httpx.MockTransport(handle), now=lambda: NOW
+    )
     pending = guard.prepare(device_id, True, session_id="owner")
     assert calls == []
     result = guard.confirm(pending.token, session_id="owner")
