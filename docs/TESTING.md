@@ -109,3 +109,15 @@ pytest tests/test_retention.py tests/unit/test_cli_prune.py -vv
 ```
 
 Aucun accès réseau n'est nécessaire. Non couvert : performance sur une base volumineuse (le filtre `source = 'ping' AND seen_at < ?` n'a pas d'index dédié, à évaluer avant une migration V3 éventuelle), exécution répétée sur une base réelle et planification périodique (hors périmètre de ce lot).
+
+## Identifications Fing
+
+Aucun test n'ouvre de connexion Fing : le lecteur est remplacé ou interdit, et les données sont synthétiques. `tests/unit/test_fing.py` couvre le lecteur (transport fixe, limites de taille, schéma, rapprochement exact MAC + IP). `tests/unit/test_identifications.py` couvre la couche de stockage SQLite. `tests/unit/test_fing_preview.py` couvre le coffre d'aperçu : usage unique, remplacement, expiration, jeton invalide et consommation concurrente. `tests/unit/test_web_fing.py` couvre la lecture et `tests/unit/test_web_fing_storage.py` le stockage : authentification, CSRF, origine, confirmation, champs injectés, rejeu et aperçu périmé. `tests/unit/test_web_fing_details.py` couvre l'affichage sur la fiche : échappement HTML, champs absents, fiche fusionnée ou MAC modifiée, et absence de modification de la base par une lecture.
+
+Reproduction hors ligne :
+
+```bash
+pytest tests/unit/test_fing.py tests/unit/test_identifications.py tests/unit/test_fing_preview.py tests/unit/test_web_fing.py tests/unit/test_web_fing_storage.py tests/unit/test_web_fing_details.py -vv
+```
+
+La CI (qualité Linux et Windows, gitleaks) a réussi sur les PR #55 et #56. Le journal pytest de la PR #56 indiquait 895 tests collectés et une couverture totale de 95,11 % ; un test devenu obsolète sur la fiche appareil (`tests/unit/test_history_charts.py`) a ensuite été mis à jour sans rien désactiver. Non testé : Fing réel, navigateur réel, réseau domestique, base Windows du propriétaire et fonctionnement avec plusieurs workers.

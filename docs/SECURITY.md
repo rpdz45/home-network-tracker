@@ -66,3 +66,11 @@ Sauvegarder la base avant la migration V2 ; l'ancien programme refusera ce sché
 - **Aucun accès réseau** et aucun privilège particulier : la commande lit et écrit uniquement la base locale. Requêtes SQL paramétrées, aucune chaîne construite à partir d'entrées utilisateur.
 
 La suppression est définitive : sauvegarde la base avant la première exécution avec `--apply`. Une clé de configuration invalide (valeurs hors bornes) est refusée au chargement.
+
+## Identifications Fing (optionnelles)
+
+L'intégration est désactivée par défaut. La lecture exige `NETTRACKER_FING_ENABLED=true`, une clé `NETTRACKER_FING_API_KEY` côté serveur (jamais dans un formulaire, un log ou le dépôt), un jeton de dashboard, le routeur authentifié, un jeton CSRF, un contrôle d'origine et une confirmation explicite. La requête vise une adresse locale fixe (`127.0.0.1:49090`), sans redirection ni proxy, avec une réponse limitée à 2 Mio et 60 secondes entre deux lectures. Fing peut collecter de son côté : vérifier ses paramètres de confidentialité.
+
+Le stockage est une action distincte, avec sa propre confirmation. L'aperçu est conservé côté serveur (un seul par processus, jeton aléatoire à usage unique, dix minutes) : le navigateur n'envoie jamais de fabricant ou de modèle à enregistrer. Seules les correspondances exactes MAC + IP avec les découvertes locales actuelles, dans `allowed_subnets`, sont conservées. Aucun appareil n'est créé, fusionné ou approuvé, et ni l'alias ni le statut connu ne changent. Les requêtes SQL sont paramétrées et les textes fournisseur sont échappés à l'affichage.
+
+Ces données sont des déclarations du fournisseur, non vérifiées indépendamment : une MAC peut être usurpée et une identification enregistrée est historique, pas une preuve de présence actuelle. Les rapports déjà stockés restent lisibles si l'intégration est désactivée, selon la politique d'accès du dashboard (lecture locale sans jeton possible sur loopback). Limite connue : l'aperçu vit en mémoire d'un seul processus, sans cache partagé entre plusieurs workers. Voir [FING_STORAGE_DASHBOARD.md](FING_STORAGE_DASHBOARD.md) et [FING_DEVICE_DETAILS.md](FING_DEVICE_DETAILS.md). Pas de validation avec un Fing réel ni sur matériel.

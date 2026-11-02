@@ -6,7 +6,7 @@ Outil local de suivi du réseau domestique : découverte des appareils, mesures 
 
 Disponibles : configuration validée, découverte passive, ARP actif explicitement autorisé, repli nmap optionnel et borné, fabricants OUI locaux, DNS inverse/mDNS optionnels, suggestions pour MAC aléatoires, liste known_devices, monitor-once, boucle ICMP manuelle avec rafraîchissement passif et rétentions optionnels, rétention de l’historique, santé du collecteur et traitement des alertes en dry-run.
 
-Le dashboard M5 est disponible : liste et fiche des appareils, événements, santé du collecteur, alias/type, marquage comme connu et historique ICMP 24 h / 7 jours. Les graphiques agrègent les sondes de la fenêtre en 96 créneaux, sans dépendre des 25 observations du tableau.
+Le dashboard M5 est disponible : liste et fiche des appareils, événements, santé du collecteur, alias/type, marquage comme connu et historique ICMP 24 h / 7 jours. Les graphiques agrègent les sondes de la fenêtre en 96 créneaux, sans dépendre des 25 observations du tableau. Une identification Fing optionnelle est aussi disponible : lecture explicite de l’API locale, stockage local après confirmation et affichage historique sur la fiche appareil.
 
 Restent notamment à livrer ou valider : démarrage et reprise automatiques en service, notifiers Discord/Telegram/e-mail, règles avancées, déploiement M6 et tests sur matériel réel. Le ratio réponses/sondes n’est pas un uptime temporel ; les créneaux sans mesure restent inconnus. La feuille de route de [AGENTS.md](AGENTS.md) reste la référence : les jalons complets ne sont pas déclarés terminés par cette liste.
 
@@ -61,6 +61,8 @@ Le fichier de configuration se choisit avec --config ou NETTRACKER_CONFIG. Pour 
 La fiche permet de modifier alias/type et d’approuver un appareil inconnu. Un alias vide retombe sur le nom d’hôte puis la MAC. Les appareils fusionnés ne sont pas modifiables ; les ignorés ne sont pas approuvés implicitement. Les événements historiques restent présents. Aucun bouton de révocation du statut connu n’est livré dans ce lot.
 
 known_devices = [] se configure à la racine de config.toml, avant [scan]. Les MAC sont normalisées ; doublons, multicast, broadcast et MAC nulle sont refusés. La liste ne lance aucun scan et ne précrée aucun appareil. Retirer une MAC ne révoque pas son statut persisté. Une MAC peut être usurpée : connu est un classement manuel, pas une authentification.
+
+Identifications Fing (optionnelles) : désactivées par défaut. Avec NETTRACKER_FING_ENABLED=true, une clé NETTRACKER_FING_API_KEY côté serveur et un jeton de dashboard, la page /identification/fing lit l’API locale de Fing après confirmation, puis peut conserver dans SQLite les correspondances exactes MAC + IP après une seconde confirmation. La fiche appareil affiche ensuite ces déclarations, datées et non vérifiées, séparément de l’alias et du fabricant réseau. Le stockage exige le schéma V3 : sauvegarder la base puis lancer nettracker init-db. Voir [FING_STORAGE_DASHBOARD.md](docs/FING_STORAGE_DASHBOARD.md) et [FING_DEVICE_DETAILS.md](docs/FING_DEVICE_DETAILS.md).
 
 Les fenêtres 24 h / 7 jours utilisent des créneaux de 15 / 105 minutes. Les dates sont en UTC, fin exclue et tronquée à la seconde. Les barres indiquent les moyennes de latence des réponses ; le tableau dépliable fournit aussi les maxima et les nombres de sondes. Aucun remplissage des périodes vides ni interpolation. Une non-réponse ICMP ne prouve pas une déconnexion. Voir [M5_DASHBOARD.md](docs/M5_DASHBOARD.md) et [M5_HISTORY_CHARTS.md](docs/M5_HISTORY_CHARTS.md).
 
@@ -138,6 +140,7 @@ Les essais navigateur/mobile, de charge, d’endurance réelle et sur le LAN doi
 - [M3_LOOP_PING_RETENTION.md](docs/M3_LOOP_PING_RETENTION.md), [M3_LOOP_DISCOVERY_RETENTION.md](docs/M3_LOOP_DISCOVERY_RETENTION.md)
 - [M4_ALERTS.md](docs/M4_ALERTS.md)
 - [M5_DASHBOARD.md](docs/M5_DASHBOARD.md), [M5_DEVICE_EDITS.md](docs/M5_DEVICE_EDITS.md), [M5_HISTORY_CHARTS.md](docs/M5_HISTORY_CHARTS.md)
+- [FING_STORAGE_DASHBOARD.md](docs/FING_STORAGE_DASHBOARD.md), [FING_DEVICE_DETAILS.md](docs/FING_DEVICE_DETAILS.md)
 - [AGENTS.md](AGENTS.md) : feuille de route et règles de contribution
 
 ## Licence
