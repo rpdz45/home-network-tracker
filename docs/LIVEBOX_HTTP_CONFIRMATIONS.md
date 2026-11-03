@@ -1,25 +1,73 @@
 # Parcours HTTP de confirmation Livebox
 
-Le module livebox_confirmations fournit un installateur explicite, desactive par defaut. create_app n'est pas modifie dans ce lot : aucune nouvelle commande utilisable depuis le dashboard de production. Aucun adaptateur reel n'est construit, aucune configuration d'activation reelle n'est ajoutee.
+## Raccordement au dashboard
 
-Les tests montent une application FastAPI isolee avec browser_auth et les routes de controle partageant exactement le meme SessionStore. Le guard resout une cible Livebox synthetique et son executeur ajoute seulement une requete dans une liste memoire. Ce n'est ni un test navigateur ni une preuve de compatibilite avec une box.
+create_app partage un SessionStore entre install_browser_auth et les routes de
+confirmation. Les routes de controle sont absentes par defaut, meme si un guard
+est fourni. Les appels existants a create_app(settings) ne les activent pas.
+
+Le raccordement exige deux arguments nommes cote serveur : livebox_guard et
+livebox_control_enabled=True. L'indicateur doit etre strictement booleen.
+L'activation sans jeton API configure ou sans guard leve ValueError avant la
+construction de l'application. Aucun bouton, parametre CLI/TOML d'activation ou
+adaptateur materiel n'est ajoute par ce raccordement.
+
+Le guard doit etre construit par du code serveur de confiance, jamais depuis les
+champs HTTP. Il doit resoudre un inventaire local fiable et refuser les appareils
+fusionnes, perimes ou ambigus. L'executeur reste responsable des protections de
+l'adaptateur, des limites reseau et de la verification de l'etat apres commande.
+Le type ControlGuards[None] correspond au contrat actuel ; il ne valide pas un
+adaptateur reel ou ses resultats.
 
 ## Parcours
 
-- GET /routers/livebox/control affiche un formulaire, sans resolution d'inventaire ni execution.
-- POST /routers/livebox/control/prepare exige une session, un CSRF lie a cette session, un identifiant local et une action stricts. Le guard resout la cible cote serveur ; le formulaire de confirmation affiche IP, MAC, identifiant et action effectivement prepares.
-- POST /routers/livebox/control/confirm exige la meme session, un CSRF lie au jeton et une case de confirmation explicite. SessionBoundControl revalide la session avant delegation au guard. Aucun renvoi automatique ni nouvel essai apres un resultat incertain.
+- GET /routers/livebox/control affiche un formulaire sans execution.
+- POST /routers/livebox/control/prepare exige une session, un CSRF lie a cette
+  session, un identifiant local et une action stricts. Le guard resout la cible
+  cote serveur. La confirmation affiche identifiant, IP, MAC et action prepares.
+- POST /routers/livebox/control/confirm exige la meme session, un CSRF lie au
+  jeton et une confirmation explicite. Le guard consomme le jeton avant execution
+  et revalide la cible. Aucun nouvel essai automatique apres un resultat incertain.
 
-Les routes refusent tout en-tete Authorization, meme en presence d'un cookie : le parcours est exclusivement navigateur. Le Bearer des autres routes n'est pas modifie. Le retrait du forcage n'est pas une garantie d'acces si le calendrier l'interdit.
+Tout en-tete Authorization est refuse sur ce parcours, meme avec un cookie
+valide. Les acces Bearer des autres routes ne sont pas modifies.
+Le retrait du forcage ne garantit pas l'acces si le calendrier l'interdit.
+La page finale indique seulement que l'executeur a termine sans erreur, pas une
+preuve d'acces Internet ou de compatibilite materielle.
 
-Le parsing reutilise les controles de browser_auth : origine si presente, refus cross-site, type de contenu, taille limitee, champs stricts. Les erreurs du guard sont rendues sans leur contenu interne. Les pages de succes ont no-store, no-referrer et CSP restrictive ; les reponses d'erreur necessiteront aussi les en-tetes globaux lors du raccordement a create_app.
+Le parsing reutilise browser_auth : controle de l'origine si presente, refus
+cross-site, formulaire URL-encode, taille limitee et champs stricts.
+Les erreurs AccessControlError sont rendues sans leur contenu interne.
+Dans create_app, le middleware global ajoute SECURITY_HEADERS aux reponses,
+y compris aux refus HTTP testes. Sa CSP globale remplace celle de l'installateur.
+Un montage isole doit fournir ses propres protections globales pour les erreurs.
 
-## Limites et suite
+## Validation et limites
 
-L'installateur exige un guard Livebox fiable fourni par le serveur, jamais par le formulaire. Le type de resultat None convient a l'executeur simule de ces tests ; le futur adaptateur reel et ses resultats verifies doivent faire l'objet d'un raccordement distinct. La page finale annonce seulement la fin sans erreur de l'executeur, pas un acces Internet prouve.
+Les tests HTTP utilisent une cible synthetique et un executeur qui ajoute seulement
+une requete a une liste en memoire. Certains montent une FastAPI isolee ; les tests
+dashboard utilisent create_app et son authentification effective, sans navigateur
+reel, sans inventaire de production et sans box reelle.
 
-La validation de session reste ponctuelle, non atomique avec une deconnexion concurrente. Un seul processus. Restent a realiser : raccordement dans create_app avec magasin partage, integration aux templates et a la navigation, tests sur le dashboard reel, limites et erreurs reseau de l'adaptateur, revue securite et validation materielle avant activation.
+Les controles Quality Linux/Windows et Gitleaks de la PR 77 ont reussi sur
+13559a317231b1a7f8b34ca63e9f88bdf11b35f1. Ce resultat ne valide pas les nouveaux
+tests ajoutes dans le present lot, ni une activation materielle.
+Ces nouveaux tests sont rediges mais non executes par l'assistant.
 
-Tests rediges mais non executes par l'assistant. Commande : python -m pytest tests/unit/test_livebox_confirmations.py tests/unit/test_session_control.py tests/unit/test_browser_auth.py
+Commandes a verifier dans l'environnement de developpement et en CI :
 
-Ruff check, Ruff format, mypy, suite complete et CI Linux/Windows restent a verifier. Aucun succes CI affirme.
+```sh
+ruff check .
+ruff format --check .
+mypy
+python -m pytest
+```
+
+La validation de session reste ponctuelle, non atomique avec une deconnexion
+concurrente. Le magasin et les confirmations sont locaux au processus : utiliser
+un seul processus. La revocation avant une requete est testable ; aucune garantie
+d'annulation d'une execution deja engagee n'est apportee.
+
+Restent : navigation/templates, resolution d'inventaire de production, traitement
+des resultats et erreurs de l'adaptateur, revue de securite et validation
+materielle distincte avant toute activation. La CI verte ne remplace pas ces etapes.
