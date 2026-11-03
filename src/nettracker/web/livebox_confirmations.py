@@ -67,7 +67,7 @@ def install_livebox_confirmation_routes(
             '<p>Aucune commande au simple affichage. Compatibilité matérielle non certifiée.</p>'
             f'<form method="post" action="{PREFIX}/prepare">'
             f'<input type="hidden" name="csrf" value="{token}">'
-            '<label>Identifiant local de l’appareil '
+            "<label>Identifiant local de l'appareil "
             '<input name="device_id" type="number" min="1" required></label>'
             '<label>Action <select name="action">'
             '<option value="block">Bloquer</option>'
@@ -103,7 +103,7 @@ def install_livebox_confirmation_routes(
             f'<p>Appareil local : {pending.device_id}</p>'
             f'<p>IP : {escape(str(pending.request.address))}</p>'
             f'<p>MAC : {escape(pending.request.mac)}</p><p>Action : {action}</p>'
-            '<p>Retirer le forçage ne garantit pas l’accès si le calendrier l’interdit.</p>'
+            "<p>Retirer le forçage ne garantit pas l'accès si le calendrier l'interdit.</p>"
             '<p>Confirmation temporaire, à usage unique. La cible sera revérifiée.</p>'
             f'<form method="post" action="{PREFIX}/confirm">'
             f'<input type="hidden" name="csrf" value="{proof}">'
@@ -128,6 +128,6 @@ def install_livebox_confirmation_routes(
                 409, "Confirmation refusée ou résultat incertain ; ne pas relancer automatiquement"
             ) from None
         return page(
-            '<h1>Traitement terminé</h1><p>L’exécuteur configuré a terminé sans erreur.</p>'
-            '<p>Ce message seul ne prouve ni l’accès Internet ni la compatibilité matérielle.</p>'
+            "<h1>Traitement terminé</h1><p>L'exécuteur configuré a terminé sans erreur.</p>"
+            "<p>Ce message seul ne prouve ni l'accès Internet ni la compatibilité matérielle.</p>"
         )
