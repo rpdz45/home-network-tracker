@@ -115,9 +115,7 @@ def application(
             200,
             json={
                 "status": True,
-                "data": {
-                    "scheduleInfo": {"enable": True, "override": override, "value": value}
-                },
+                "data": {"scheduleInfo": {"enable": True, "override": override, "value": value}},
             },
         )
 
@@ -131,9 +129,7 @@ def application(
         gateway_mac="02:00:00:00:00:03",
         enabled=refusal != "disabled",
     )
-    guard = build_livebox_control(
-        config, transport=httpx.MockTransport(handle), now=lambda: now[0]
-    )
+    guard = build_livebox_control(config, transport=httpx.MockTransport(handle), now=lambda: now[0])
     assert methods == []
     settings = Settings.model_validate(
         {
@@ -263,9 +259,7 @@ def test_http_prepare_refusal_never_reaches_adapter(tmp_path: Path, refusal: str
 
 
 @pytest.mark.parametrize("change", ["stale", "ambiguous"])
-def test_http_inventory_revalidation_consumes_without_adapter(
-    tmp_path: Path, change: str
-) -> None:
+def test_http_inventory_revalidation_consumes_without_adapter(tmp_path: Path, change: str) -> None:
     harness = application(tmp_path)
     with TestClient(harness.app) as client:
         login(client)
