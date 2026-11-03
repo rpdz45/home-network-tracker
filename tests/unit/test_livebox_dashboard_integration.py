@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 from nettracker.config import Settings
 from nettracker.routers.control import AccessRequest, RouterKind
 from nettracker.routers.control_guards import ControlGuards
+from nettracker.routers.livebox5_access import ScheduleState
+from nettracker.routers.livebox5_control import ControlResult
 from nettracker.web.app import SECURITY_HEADERS, create_app
 from nettracker.web.livebox_confirmations import PREFIX
 
@@ -24,12 +26,16 @@ def settings(*, authenticated: bool = True) -> Settings:
     )
 
 
-def guard(calls: list[AccessRequest]) -> ControlGuards[None]:
-    return ControlGuards[None](
+def guard(calls: list[AccessRequest]) -> ControlGuards[ControlResult]:
+    def execute(request: AccessRequest) -> ControlResult:
+        calls.append(request)
+        return ControlResult(True, ScheduleState("Disable" if request.blocked else "", "Disable"))
+
+    return ControlGuards(
         lambda device, blocked: AccessRequest(
             RouterKind.LIVEBOX5, IPv4Address("192.168.1.20"), "02:00:00:00:00:20", blocked
         ),
-        calls.append,
+        execute,
         [IPv4Network("192.168.1.0/24")],
         ["02:00:00:00:00:01"],
         enabled=True,
@@ -100,6 +106,8 @@ def test_dashboard_sessions_confirm_once_and_security_headers_cover_errors() -> 
         assert calls == []
         response = client.post(PREFIX + "/confirm", data=data)
         assert response.status_code == 200
+        assert "Résultat du contrôle Livebox" in response.text
+        assert "Modification effectuée" in response.text
         assert len(calls) == 1
         replay = client.post(PREFIX + "/confirm", data=data)
         assert replay.status_code == 409

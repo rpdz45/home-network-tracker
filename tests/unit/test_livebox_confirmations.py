@@ -1,16 +1,22 @@
-"""Isolated HTTP flow sharing actual browser sessions; executor only records in memory."""
+"""Isolated HTTP flow sharing actual browser sessions; synthetic execution only."""
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv4Network
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from nettracker.routers.control import AccessRequest, RouterKind
+from nettracker.routers.control import AccessControlError, AccessRequest, RouterKind
 from nettracker.routers.control_guards import ControlGuards
+from nettracker.routers.livebox5 import LiveboxError
+from nettracker.routers.livebox5_access import ScheduleState
+from nettracker.routers.livebox5_control import ControlResult
 from nettracker.web.browser_auth import install_browser_auth
 from nettracker.web.livebox_confirmations import PREFIX, install_livebox_confirmation_routes
+from nettracker.web.livebox_results import FAILURE_DETAIL
 from nettracker.web.sessions import SessionStore
 
 CREDENTIAL = "synthetic-http-confirmation-credential"
@@ -23,15 +29,29 @@ class Harness:
     now: list[float]
 
 
-def application(*, enabled: bool = True, session_ttl: float = 8 * 3600) -> Harness:
+def application(
+    *,
+    enabled: bool = True,
+    session_ttl: float = 8 * 3600,
+    execute: Callable[[AccessRequest], object] | None = None,
+) -> Harness:
     now = [0.0]
     sessions = SessionStore(ttl=session_ttl, clock=lambda: now[0])
     calls: list[AccessRequest] = []
-    guard = ControlGuards[None](
+
+    def record(request: AccessRequest) -> object:
+        calls.append(request)
+        if execute is not None:
+            return execute(request)
+        return ControlResult(
+            True, ScheduleState("Disable" if request.blocked else "", "Disable")
+        )
+
+    guard = ControlGuards[object](
         lambda device, blocked: AccessRequest(
             RouterKind.LIVEBOX5, IPv4Address("192.168.1.20"), "02:00:00:00:00:20", blocked
         ),
-        calls.append,
+        record,
         [IPv4Network("192.168.1.0/24")],
         ["02:00:00:00:00:01"],
         enabled=True,
@@ -59,17 +79,21 @@ def login(client: TestClient) -> None:
     assert response.status_code == 303
 
 
-def prepare(client: TestClient) -> dict[str, str]:
+def prepare(client: TestClient, *, blocked: bool = True) -> dict[str, str]:
     page = client.get(PREFIX)
     assert page.status_code == 200
     response = client.post(
         PREFIX + "/prepare",
-        data={"csrf": field(page.text, "csrf"), "device_id": "1", "action": "block"},
+        data={
+            "csrf": field(page.text, "csrf"),
+            "device_id": "1",
+            "action": "block" if blocked else "release",
+        },
     )
     assert response.status_code == 200
     assert "192.168.1.20" in response.text
     assert "02:00:00:00:00:20" in response.text
-    assert "Action : Bloquer" in response.text
+    assert ("Action : Bloquer" if blocked else "Action : Retirer le forçage") in response.text
     return {
         "csrf": field(response.text, "csrf"),
         "token": field(response.text, "token"),
@@ -86,6 +110,8 @@ def test_prepare_is_inert_confirm_once_and_replay_refused() -> None:
         response = client.post(PREFIX + "/confirm", data=data)
         assert response.status_code == 200
         assert response.headers["cache-control"] == "no-store"
+        assert "Résultat du contrôle Livebox" in response.text
+        assert "Modification effectuée" in response.text
         assert len(harness.calls) == 1
         assert client.post(PREFIX + "/confirm", data=data).status_code == 409
         assert len(harness.calls) == 1
@@ -159,3 +185,72 @@ def test_bearer_and_disabled_flow_are_refused() -> None:
         assert client.post(PREFIX + "/prepare", data={}).status_code == 403
         assert client.post(PREFIX + "/confirm", data={}).status_code == 403
     assert harness.calls == disabled.calls == []
+
+
+@pytest.mark.parametrize("blocked", [True, False])
+@pytest.mark.parametrize("changed", [True, False])
+def test_http_renders_result_for_server_confirmed_action(blocked: bool, changed: bool) -> None:
+    harness = application(
+        execute=lambda request: ControlResult(
+            changed, ScheduleState("Disable" if request.blocked else "", "Disable")
+        )
+    )
+    with TestClient(harness.app) as client:
+        login(client)
+        data = prepare(client, blocked=blocked)
+        response = client.post(PREFIX + "/confirm", data=data)
+        assert response.status_code == 200
+        assert (
+            "Modification effectuée" if changed else "Etat déjà conforme, sans modification"
+        ) in response.text
+        assert ("Forçage de blocage présent" if blocked else "Aucun forçage") in response.text
+        assert "accès désactivé" in response.text
+        assert "ne prouve pas" in response.text
+        assert "Traitement terminé" not in response.text
+        assert 'name="token"' not in response.text
+        assert len(harness.calls) == 1
+        assert harness.calls[0].blocked is blocked
+        assert client.post(PREFIX + "/confirm", data=data).status_code == 409
+        assert len(harness.calls) == 1
+
+
+@pytest.mark.parametrize("error_type", [AccessControlError, LiveboxError])
+def test_http_known_failure_is_masked_and_cannot_replay(error_type: type[Exception]) -> None:
+    def fail(request: AccessRequest) -> object:
+        raise error_type("synthetic-private-detail")
+
+    harness = application(execute=fail)
+    with TestClient(harness.app) as client:
+        login(client)
+        data = prepare(client)
+        for _ in range(2):
+            response = client.post(PREFIX + "/confirm", data=data)
+            assert response.status_code == 409
+            assert response.json() == {"detail": FAILURE_DETAIL}
+            assert "synthetic-private-detail" not in response.text
+        assert len(harness.calls) == 1
+
+
+@pytest.mark.parametrize("result", [None, ControlResult(True, ScheduleState("", "Enable"))])
+def test_http_invalid_result_is_not_success_and_cannot_replay(result: object) -> None:
+    harness = application(execute=lambda request: result)
+    with TestClient(harness.app) as client:
+        login(client)
+        data = prepare(client)
+        for _ in range(2):
+            response = client.post(PREFIX + "/confirm", data=data)
+            assert response.status_code == 409
+            assert response.json() == {"detail": FAILURE_DETAIL}
+        assert len(harness.calls) == 1
+
+
+def test_http_cannot_supply_a_different_confirmed_action() -> None:
+    harness = application()
+    with TestClient(harness.app) as client:
+        login(client)
+        data = prepare(client)
+        assert client.post(PREFIX + "/confirm", data={**data, "action": "release"}).status_code == 422
+        assert harness.calls == []
+        assert client.post(PREFIX + "/confirm", data=data).status_code == 200
+        assert len(harness.calls) == 1
+        assert harness.calls[0].blocked is True

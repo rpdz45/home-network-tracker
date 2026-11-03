@@ -9,8 +9,11 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from nettracker.config import Settings
 from nettracker.routers.control import AccessRequest, RouterKind
 from nettracker.routers.control_guards import ControlGuards
+from nettracker.routers.livebox5_access import ScheduleState
+from nettracker.routers.livebox5_control import ControlResult
 from nettracker.web.app import COOKIE_NAME, SECURITY_HEADERS, TEMPLATES_DIR, create_app
 from nettracker.web.livebox_confirmations import PREFIX
+from nettracker.web.livebox_results import ControlResultView
 
 CREDENTIAL = "synthetic-template-credential"
 
@@ -23,11 +26,16 @@ def field(text: str, name: str) -> str:
 
 def test_all_stages_share_navigation_without_exposing_session() -> None:
     calls: list[AccessRequest] = []
-    guard = ControlGuards[None](
+
+    def execute(request: AccessRequest) -> ControlResult:
+        calls.append(request)
+        return ControlResult(True, ScheduleState("Disable" if request.blocked else "", "Disable"))
+
+    guard = ControlGuards(
         lambda device, blocked: AccessRequest(
             RouterKind.LIVEBOX5, IPv4Address("192.168.1.20"), "02:00:00:00:00:20", blocked
         ),
-        calls.append,
+        execute,
         [IPv4Network("192.168.1.0/24")],
         ["02:00:00:00:00:01"],
         enabled=True,
@@ -63,6 +71,7 @@ def test_all_stages_share_navigation_without_exposing_session() -> None:
         }
         done = client.post(PREFIX + "/confirm", data=data)
         assert done.status_code == 200
+        assert "Résultat du contrôle Livebox" in done.text
         assert len(calls) == 1
         for stage in [page, prepared, done]:
             assert 'aria-label="Navigation principale"' in stage.text
@@ -96,3 +105,19 @@ def test_confirmation_template_escapes_text_and_hidden_fields() -> None:
     assert payload not in text
     assert "<script>" not in text
     assert "&lt;script&gt;" in text
+
+
+def test_result_template_escapes_every_presented_field() -> None:
+    env = Environment(
+        loader=FileSystemLoader(TEMPLATES_DIR), undefined=StrictUndefined, autoescape=True
+    )
+    payload = '<script>alert("synthetic")</script>'
+    text = env.get_template("livebox_confirmation.html").render(
+        stage="done",
+        prefix=PREFIX,
+        result=ControlResultView(payload, payload, payload, payload),
+    )
+    assert payload not in text
+    assert "<script>" not in text
+    assert text.count("&lt;script&gt;") == 4
+    assert 'name="token"' not in text
