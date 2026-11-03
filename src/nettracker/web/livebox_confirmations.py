@@ -3,6 +3,7 @@
 import hmac
 import secrets
 from pathlib import Path
+from typing import TypeVar
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -12,9 +13,11 @@ from starlette.concurrency import run_in_threadpool
 from nettracker.routers.control import AccessControlError, RouterKind
 from nettracker.routers.control_guards import ControlGuards
 from nettracker.web.browser_auth import COOKIE_NAME, _form, _matches
+from nettracker.web.livebox_execution import confirm_livebox_result
 from nettracker.web.session_control import SessionBoundControl
 from nettracker.web.sessions import SessionStore
 
+Result = TypeVar("Result")
 PREFIX = "/routers/livebox/control"
 HEADERS = {
     "Cache-Control": "no-store",
@@ -30,7 +33,7 @@ HEADERS = {
 def install_livebox_confirmation_routes(
     app: FastAPI,
     sessions: SessionStore,
-    guard: ControlGuards[None],
+    guard: ControlGuards[Result],
     *,
     enabled: bool = False,
 ) -> None:
@@ -38,6 +41,7 @@ def install_livebox_confirmation_routes(
 
     Callers retain adapter validation and read-back responsibility. This module
     does not enable itself, choose a router, load credentials or open a database.
+    A missing or inconsistent executor result is refused, not shown as success.
     """
     control = SessionBoundControl(sessions, guard, enabled=enabled)
     key = secrets.token_bytes(32)
@@ -111,10 +115,7 @@ def install_livebox_confirmation_routes(
             raise HTTPException(403, "Protection CSRF invalide")
         if form["confirm"] != "yes":
             raise HTTPException(422, "Confirmation explicite requise")
-        try:
-            await run_in_threadpool(control.confirm, form["token"], cookie=cookie)
-        except AccessControlError:
-            raise HTTPException(
-                409, "Confirmation refusée ou résultat incertain ; ne pas relancer automatiquement"
-            ) from None
-        return page(request, "done", {})
+        result = await run_in_threadpool(
+            confirm_livebox_result, control, form["token"], cookie=cookie
+        )
+        return page(request, "done", {"result": result})

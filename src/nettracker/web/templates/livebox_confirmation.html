@@ -30,9 +30,11 @@ Je confirme cette cible et cette action.</label>
 <button type="submit">Confirmer</button>
 </form>
 {% elif stage == "done" %}
-<h1>Traitement terminé</h1>
-<p>L'exécuteur configuré a terminé sans erreur.</p>
-<p>Ce message seul ne prouve ni l'accès Internet ni la compatibilité matérielle.</p>
+<h1>{{ result.title }}</h1>
+<p>{{ result.change }}</p>
+<p>{{ result.schedule }}</p>
+<p>{{ result.warning }}</p>
+<p>Compatibilité matérielle non certifiée.</p>
 {% endif %}
 <p><a href="/routers">Retour aux routeurs</a></p>
 {% endblock %}

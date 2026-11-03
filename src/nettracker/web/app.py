@@ -8,7 +8,7 @@ from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeVar
 from urllib.parse import parse_qs
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
@@ -32,6 +32,7 @@ from nettracker.web.sessions import SessionStore
 from nettracker.web.timeseries import load_series
 
 logger = logging.getLogger(__name__)
+Result = TypeVar("Result")
 
 COOKIE_MAX_AGE = 8 * 3600
 MAX_LOGIN_BYTES = 4096
@@ -102,13 +103,15 @@ def create_app(
     settings: Settings,
     *,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
-    livebox_guard: ControlGuards[None] | None = None,
+    livebox_guard: ControlGuards[Result] | None = None,
     livebox_control_enabled: bool = False,
 ) -> FastAPI:
     """Build the dashboard; Livebox control needs explicit server-side injection.
 
     No adapter is constructed here. The caller owns trusted inventory resolution,
     adapter validation and read-back verification. Use a single process.
+    Enabled confirmations require a valid Livebox ControlResult for success;
+    an executor returning None is no longer reported as a successful command.
     """
     expected = _expected_credential(settings)
     if type(livebox_control_enabled) is not bool:
