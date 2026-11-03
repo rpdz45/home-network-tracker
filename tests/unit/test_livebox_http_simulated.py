@@ -2,6 +2,7 @@
 
 import json
 import re
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from ipaddress import IPv4Network
@@ -25,7 +26,8 @@ from nettracker.web.livebox_results import FAILURE_DETAIL
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
 MAC = "02:00:00:00:00:20"
 CREDENTIAL = "synthetic-http-builder-credential"
-PASSWORD = "synthetic-http-builder-password"
+# Ephemeral test-only credential used exclusively with MockTransport.
+PASSWORD = secrets.token_urlsafe(24)
 CONTEXT = "synthetic-http-context"
 
 
