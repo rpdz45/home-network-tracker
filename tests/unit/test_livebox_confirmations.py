@@ -249,7 +249,8 @@ def test_http_cannot_supply_a_different_confirmed_action() -> None:
     with TestClient(harness.app) as client:
         login(client)
         data = prepare(client)
-        assert client.post(PREFIX + "/confirm", data={**data, "action": "release"}).status_code == 422
+        denied = client.post(PREFIX + "/confirm", data={**data, "action": "release"})
+        assert denied.status_code == 422
         assert harness.calls == []
         assert client.post(PREFIX + "/confirm", data=data).status_code == 200
         assert len(harness.calls) == 1
