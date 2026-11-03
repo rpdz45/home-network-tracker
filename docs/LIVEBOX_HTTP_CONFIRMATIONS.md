@@ -9,8 +9,8 @@ est fourni. Les appels existants a create_app(settings) ne les activent pas.
 Le raccordement exige deux arguments nommes cote serveur : livebox_guard et
 livebox_control_enabled=True. L'indicateur doit etre strictement booleen.
 L'activation sans jeton API configure ou sans guard leve ValueError avant la
-construction de l'application. Aucun bouton, parametre CLI/TOML d'activation ou
-adaptateur materiel n'est ajoute par ce raccordement.
+construction de l'application. Aucun parametre CLI/TOML d'activation ou adaptateur
+materiel n'est ajoute par ce raccordement.
 
 Le guard doit etre construit par du code serveur de confiance, jamais depuis les
 champs HTTP. Il doit resoudre un inventaire local fiable et refuser les appareils
@@ -18,6 +18,21 @@ fusionnes, perimes ou ambigus. L'executeur reste responsable des protections de
 l'adaptateur, des limites reseau et de la verification de l'etat apres commande.
 Le type ControlGuards[None] correspond au contrat actuel ; il ne valide pas un
 adaptateur reel ou ses resultats.
+
+## Navigation
+
+Le template commun propose le lien Controle Livebox vers
+/routers/livebox/control uniquement si le contexte contient une session navigateur
+et si app.state.livebox_control_navigation vaut strictement True.
+create_app initialise cet indicateur a False et le passe a True apres installation
+explicite des routes. Cet indicateur est une information de presentation, pas une
+autorisation : le modifier ne remplace pas les controles des routes.
+
+Sans activation, sans session navigateur ou avec un acces Bearer, le lien reste
+masque dans les pages protegees du dashboard. Les rendus sans contexte HTTP complet
+restent pris en charge. Le lien ouvre seulement un formulaire GET, sans commande.
+Les pages de preparation et de confirmation conservent leur HTML autonome ; elles
+ne reprennent pas encore la navigation et le style des templates du dashboard.
 
 ## Parcours
 
@@ -49,10 +64,17 @@ une requete a une liste en memoire. Certains montent une FastAPI isolee ; les te
 dashboard utilisent create_app et son authentification effective, sans navigateur
 reel, sans inventaire de production et sans box reelle.
 
-Les controles Quality Linux/Windows et Gitleaks de la PR 77 ont reussi sur
-13559a317231b1a7f8b34ca63e9f88bdf11b35f1. Ce resultat ne valide pas les nouveaux
-tests ajoutes dans le present lot, ni une activation materielle.
-Ces nouveaux tests sont rediges mais non executes par l'assistant.
+Les tests de rendu de navigation utilisent Jinja StrictUndefined avec contexte
+synthetique. Les tests de test_livebox_navigation_http.py utilisent TestClient :
+connexion effective, page /routers, lien conditionnel, GET du formulaire sans
+execution, refus Bearer meme avec cookie, deconnexion et parcours desactive.
+Ils utilisent un chemin de base absent et verifient qu'aucune base n'est creee.
+Cela ne remplace pas un essai dans un navigateur reel.
+
+Les controles Quality Linux/Windows et Gitleaks de la PR 79 ont reussi sur
+80e65602c7fd9ed1ae9e1ec9965cfeacc3cab19b. Ce resultat ne valide pas les nouveaux
+tests HTTP du present lot, ni une activation materielle. Ces nouveaux tests sont
+rediges mais non executes par l'assistant.
 
 Commandes a verifier dans l'environnement de developpement et en CI :
 
@@ -68,6 +90,7 @@ concurrente. Le magasin et les confirmations sont locaux au processus : utiliser
 un seul processus. La revocation avant une requete est testable ; aucune garantie
 d'annulation d'une execution deja engagee n'est apportee.
 
-Restent : navigation/templates, resolution d'inventaire de production, traitement
-des resultats et erreurs de l'adaptateur, revue de securite et validation
-materielle distincte avant toute activation. La CI verte ne remplace pas ces etapes.
+Restent : integration des pages de confirmation aux templates, resolution
+d'inventaire de production, traitement des resultats et erreurs de l'adaptateur,
+revue de securite et validation materielle distincte avant toute activation.
+La CI verte ne remplace pas ces etapes.
