@@ -1,4 +1,4 @@
-"""Pure result presentation and an explicit error boundary; not installed in routes."""
+"""Result presentation used by the session-bound HTTP confirmation boundary."""
 
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -58,8 +58,10 @@ def confirmed_result_view(
 ) -> ControlResultView:
     """Invoke once; callers must supply an already session-bound confirmation.
 
-    This helper does not authenticate, prepare, consume tokens or retry. It is
-    not connected to the current HTTP routes or to a hardware constructor.
+    This standalone helper does not authenticate, prepare, consume tokens or
+    retry. HTTP routes instead use livebox_execution.confirm_livebox_result,
+    which obtains the server-owned action from confirm_with_request and calls
+    describe_control_result directly. Neither helper constructs an adapter.
     """
     if type(blocked) is not bool:
         raise HTTPException(409, FAILURE_DETAIL)
