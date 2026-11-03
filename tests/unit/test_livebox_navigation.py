@@ -47,7 +47,7 @@ def test_navigation_requires_enabled_app_and_browser_session(
 
 
 @pytest.mark.parametrize(
-    "request",
+    "request_context",
     [
         SimpleNamespace(),
         SimpleNamespace(state=SimpleNamespace()),
@@ -58,9 +58,9 @@ def test_navigation_requires_enabled_app_and_browser_session(
         ),
     ],
 )
-def test_incomplete_context_hides_livebox_link(request: object) -> None:
+def test_incomplete_context_hides_livebox_link(request_context: object) -> None:
     env = Environment(
         loader=FileSystemLoader(TEMPLATES_DIR), undefined=StrictUndefined, autoescape=True
     )
-    text = env.get_template("base.html").render(request=request)
+    text = env.get_template("base.html").render(request=request_context)
     assert 'href="/routers/livebox/control"' not in text
