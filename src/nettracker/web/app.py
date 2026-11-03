@@ -21,11 +21,14 @@ from nettracker.db import Repository, connect
 from nettracker.db.device_edits import DEVICE_TYPES, mark_known, update_identity
 from nettracker.db.health import CollectorHealth, collector_health
 from nettracker.errors import NetTrackerError
+from nettracker.routers.control_guards import ControlGuards
 from nettracker.web import queries
 from nettracker.web.browser_auth import COOKIE_NAME as COOKIE_NAME
 from nettracker.web.browser_auth import install_browser_auth
 from nettracker.web.formatting import paris_datetime
+from nettracker.web.livebox_confirmations import install_livebox_confirmation_routes
 from nettracker.web.router_dashboard import install_router_dashboard
+from nettracker.web.sessions import SessionStore
 from nettracker.web.timeseries import load_series
 
 logger = logging.getLogger(__name__)
@@ -99,14 +102,27 @@ def create_app(
     settings: Settings,
     *,
     clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+    livebox_guard: ControlGuards[None] | None = None,
+    livebox_control_enabled: bool = False,
 ) -> FastAPI:
-    """Build the dashboard with opaque browser sessions and existing Bearer access."""
+    """Build the dashboard; Livebox control needs explicit server-side injection.
+
+    No adapter is constructed here. The caller owns trusted inventory resolution,
+    adapter validation and read-back verification. Use a single process.
+    """
     expected = _expected_credential(settings)
+    if type(livebox_control_enabled) is not bool:
+        raise ValueError("livebox_control_enabled must be a bool")
+    if livebox_control_enabled and (expected is None or livebox_guard is None):
+        raise ValueError("Livebox control requires a credential and a server-owned guard")
     csrf_key = secrets.token_bytes(32)
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["paris_datetime"] = paris_datetime
     app = FastAPI(title="Home Network Tracker", docs_url=None, redoc_url=None, openapi_url=None)
-    require_auth = install_browser_auth(app, expected)
+    sessions = SessionStore()
+    require_auth = install_browser_auth(app, expected, sessions=sessions)
+    if livebox_control_enabled and livebox_guard is not None:
+        install_livebox_confirmation_routes(app, sessions, livebox_guard, enabled=True)
 
     def csrf_for(device_id: int) -> str:
         return hmac.digest(csrf_key, str(device_id).encode(), "sha256").hex()
