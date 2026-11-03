@@ -98,7 +98,11 @@ def test_explicit_read_without_environment_flags(
         return bbox_session.BboxSnapshot(
             model,
             "synthetic",
-            (bbox_session.BboxHost(1, "<b>Salon</b>", "192.168.1.20", "02:00:00:00:00:20", True, None),),
+            (
+                bbox_session.BboxHost(
+                    1, "<b>Salon</b>", "192.168.1.20", "02:00:00:00:00:20", True, None
+                ),
+            ),
             True,
         )
 

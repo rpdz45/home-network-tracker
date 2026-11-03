@@ -115,7 +115,9 @@ def install_router_setup(
                 address = bbox._origin(form["address"], settings.allowed_subnets, allow_http)
         except (livebox5.LiveboxError, bbox.BboxError):
             raise HTTPException(
-                422, "Adresse refusée : IPv4 privée autorisée et HTTPS, ou HTTP accepté explicitement"
+                422,
+                "Adresse refusée : IPv4 privée autorisée et HTTPS, "
+                "ou HTTP accepté explicitement",
             ) from None
         if not lock.acquire(blocking=False):
             raise HTTPException(429, "Une lecture de box est déjà en cours")
@@ -123,7 +125,9 @@ def install_router_setup(
             cooldown = 60 if kind == "livebox5" else 900
             previous = attempts.get(kind)
             if previous is not None and monotonic() - previous < cooldown:
-                raise HTTPException(429, f"Attendre {cooldown} secondes entre lectures de cette box")
+                raise HTTPException(
+                    429, f"Attendre {cooldown} secondes entre lectures de cette box"
+                )
             attempts[kind] = monotonic()
             password = SecretStr(form["password"])
             rows: list[dict[str, str]] = []
@@ -162,7 +166,9 @@ def install_router_setup(
                         allow_http=allow_http,
                     )
                     for host in bbox_snapshot.hosts:
-                        state = "Actif selon la box" if host.active is True else "État non renseigné"
+                        state = (
+                            "Actif selon la box" if host.active is True else "État non renseigné"
+                        )
                         if host.active is False:
                             state = "Inactif selon la box"
                         rows.append(

@@ -113,7 +113,9 @@ def install_router_dashboard(
         try:
             now = monotonic()
             if last_attempt is not None and now - last_attempt < COOLDOWN_SECONDS:
-                raise HTTPException(status_code=429, detail="Attendre 10 secondes entre diagnostics")
+                raise HTTPException(
+                    status_code=429, detail="Attendre 10 secondes entre diagnostics"
+                )
             last_attempt = now
             try:
                 probes = await run_in_threadpool(
