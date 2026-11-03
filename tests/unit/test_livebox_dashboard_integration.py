@@ -106,8 +106,11 @@ def test_dashboard_sessions_confirm_once_and_security_headers_cover_errors() -> 
         for name, value in SECURITY_HEADERS.items():
             assert replay.headers[name] == value
         page = client.get("/logout")
-        assert client.post(
-            "/logout", data={"csrf": field(page.text, "csrf")}, follow_redirects=False
-        ).status_code == 303
+        assert (
+            client.post(
+                "/logout", data={"csrf": field(page.text, "csrf")}, follow_redirects=False
+            ).status_code
+            == 303
+        )
         assert client.get(PREFIX).status_code == 403
         assert len(calls) == 1
