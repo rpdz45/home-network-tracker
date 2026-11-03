@@ -63,8 +63,8 @@ def install_livebox_confirmation_routes(
         cookie = session_cookie(request)
         token = csrf(cookie, "prepare")
         return page(
-            '<h1>Préparer une commande Livebox</h1>'
-            '<p>Aucune commande au simple affichage. Compatibilité matérielle non certifiée.</p>'
+            "<h1>Préparer une commande Livebox</h1>"
+            "<p>Aucune commande au simple affichage. Compatibilité matérielle non certifiée.</p>"
             f'<form method="post" action="{PREFIX}/prepare">'
             f'<input type="hidden" name="csrf" value="{token}">'
             "<label>Identifiant local de l'appareil "
@@ -99,17 +99,17 @@ def install_livebox_confirmation_routes(
         token = escape(pending.token, quote=True)
         proof = csrf(cookie, "confirm:" + pending.token)
         return page(
-            '<h1>Confirmer la commande Livebox</h1>'
-            f'<p>Appareil local : {pending.device_id}</p>'
-            f'<p>IP : {escape(str(pending.request.address))}</p>'
-            f'<p>MAC : {escape(pending.request.mac)}</p><p>Action : {action}</p>'
+            "<h1>Confirmer la commande Livebox</h1>"
+            f"<p>Appareil local : {pending.device_id}</p>"
+            f"<p>IP : {escape(str(pending.request.address))}</p>"
+            f"<p>MAC : {escape(pending.request.mac)}</p><p>Action : {action}</p>"
             "<p>Retirer le forçage ne garantit pas l'accès si le calendrier l'interdit.</p>"
-            '<p>Confirmation temporaire, à usage unique. La cible sera revérifiée.</p>'
+            "<p>Confirmation temporaire, à usage unique. La cible sera revérifiée.</p>"
             f'<form method="post" action="{PREFIX}/confirm">'
             f'<input type="hidden" name="csrf" value="{proof}">'
             f'<input type="hidden" name="token" value="{token}">'
             '<label><input type="checkbox" name="confirm" value="yes" required>'
-            ' Je confirme cette cible et cette action.</label>'
+            " Je confirme cette cible et cette action.</label>"
             '<button type="submit">Confirmer</button></form>'
         )
 
