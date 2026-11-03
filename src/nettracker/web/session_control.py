@@ -36,9 +36,7 @@ class SessionBoundControl(Generic[Result]):
             raise AccessControlError("a valid browser session is required")
         return session
 
-    def prepare(
-        self, device_id: int, blocked: bool, *, cookie: str | None
-    ) -> PendingControl:
+    def prepare(self, device_id: int, blocked: bool, *, cookie: str | None) -> PendingControl:
         """Resolve the target without executing, bound to a currently valid session."""
         session = self._session(cookie)
         return self._guard.prepare(device_id, blocked, session_id=session)
