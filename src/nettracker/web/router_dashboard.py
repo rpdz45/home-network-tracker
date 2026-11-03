@@ -16,6 +16,7 @@ from nettracker.routers import bbox
 from nettracker.web.bbox_dashboard import install_bbox_dashboard
 from nettracker.web.fing_dashboard import install_fing_dashboard
 from nettracker.web.livebox_dashboard import install_livebox_dashboard
+from nettracker.web.router_setup import install_router_setup
 
 MAX_FORM_BYTES = 2048
 COOLDOWN_SECONDS = 10
@@ -33,6 +34,7 @@ def install_router_dashboard(
     install_livebox_dashboard(protected, settings, templates)
     install_bbox_dashboard(protected, settings, templates)
     install_fing_dashboard(protected, settings, templates)
+    install_router_setup(protected, settings, templates)
     enabled = os.environ.get("NETTRACKER_BBOX_DIAGNOSTICS_ENABLED") == "true"
     raw_address = os.environ.get("NETTRACKER_BBOX_URL", "")
     allow_http = os.environ.get("NETTRACKER_BBOX_ALLOW_HTTP") == "true"
@@ -111,9 +113,7 @@ def install_router_dashboard(
         try:
             now = monotonic()
             if last_attempt is not None and now - last_attempt < COOLDOWN_SECONDS:
-                raise HTTPException(
-                    status_code=429, detail="Attendre 10 secondes entre diagnostics"
-                )
+                raise HTTPException(status_code=429, detail="Attendre 10 secondes entre diagnostics")
             last_attempt = now
             try:
                 probes = await run_in_threadpool(

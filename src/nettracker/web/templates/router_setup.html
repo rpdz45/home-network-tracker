@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Configurer ma box · Home Network Tracker{% endblock %}
+{% block content %}
+<p><a href="/routers">Retour aux routeurs</a></p>
+<h1>Configurer et lire ma box</h1>
+<p>Choisissez votre Livebox 5 ou votre Bbox et renseignez son adresse ici, sans variable à saisir dans le terminal.</p>
+<p>Lecture de l'inventaire uniquement : aucune commande de blocage. Compatibilité matérielle non certifiée.</p>
+<p>Cette première version ne conserve pas les paramètres entre les lectures ou les redémarrages. Le mot de passe n'est pas enregistré et doit être ressaisi.</p>
+<p>Sous-réseaux autorisés par le serveur : {{ subnets|join(', ') }}. Ce formulaire ne les élargit pas.</p>
+<form method="post" action="/routers/setup/read">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<p><label>Type de box <select name="kind">
+<option value="livebox5" {% if kind == 'livebox5' %}selected{% endif %}>Livebox 5</option>
+<option value="bbox" {% if kind == 'bbox' %}selected{% endif %}>Bbox</option>
+</select></label></p>
+<p><label>Adresse d'administration, avec http:// ou https://
+<input name="address" type="url" value="{{ address }}" maxlength="256" required autocomplete="off"></label></p>
+<p class="note">Utilisez l'adresse IPv4 de votre box, sans chemin ni identifiants dans l'URL. Aucun nom de domaine n'est accepté dans ce premier lot.</p>
+<p><label>Modèle exact attendu (Bbox uniquement)
+<input name="model" value="{{ model }}" maxlength="128" autocomplete="off"></label></p>
+<p class="note">La Bbox vérifie le modèle après connexion, pas avant l'envoi du mot de passe. Vérifiez vous-même la cible. Pour Livebox, le compte utilisé est admin.</p>
+<p><label>Transport <select name="allow_http">
+<option value="no" {% if not allow_http %}selected{% endif %}>HTTPS uniquement (recommandé)</option>
+<option value="yes" {% if allow_http %}selected{% endif %}>J'accepte HTTP local non chiffré si mon URL utilise HTTP</option>
+</select></label></p>
+<p class="note">En HTTP, le mot de passe et les échanges vers la box ne sont pas chiffrés. En HTTPS, la vérification du certificat reste active ; aucun contournement TLS n'est ajouté.</p>
+<p><label>Mot de passe administrateur de la box
+<input name="password" type="password" required maxlength="256" autocomplete="off"></label></p>
+<p><label><input name="confirm" type="checkbox" value="yes" required> J'autorise cette connexion administrateur et cette lecture sur ma box, à l'adresse indiquée.</label></p>
+<button type="submit">Se connecter et lire les appareils</button>
+</form>
+<p class="note">Une seule tentative, sans relance automatique. Délai entre lectures : 60 secondes pour Livebox, 15 minutes pour Bbox, y compris après échec. Une session Livebox peut subsister jusqu'à expiration.</p>
+{% if error %}<p role="alert">Lecture impossible : vérifiez l'adresse, le mot de passe, le modèle et la confiance du certificat. Aucun accès réussi n'est confirmé. Le mot de passe doit être ressaisi.</p>{% endif %}
+{% if loaded %}
+<h2>Inventaire communiqué par la box</h2>
+<div class="panel table-scroll"><table>
+<thead><tr><th>Nom communiqué</th><th>IP</th><th>MAC</th><th>État communiqué</th></tr></thead>
+<tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.ip }}</td><td>{{ row.mac }}</td><td>{{ row.state }}</td></tr>{% else %}<tr><td colspan="4">Aucun appareil communiqué.</td></tr>{% endfor %}</tbody>
+</table></div>
+<p>Ces noms sont affichés uniquement ici. Leur enregistrement dans « Mes appareils » sera un lot distinct ; aucun alias n'a été remplacé. Un état communiqué ne prouve pas la présence actuelle.</p>
+{% endif %}
+<p class="note">Aucune connexion à l'ouverture de cette page, aucune actualisation automatique et aucun stockage dans SQLite.</p>
+{% endblock %}
