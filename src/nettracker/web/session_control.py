@@ -3,7 +3,7 @@
 from typing import Generic, TypeVar
 
 from nettracker.routers.control import AccessControlError
-from nettracker.routers.control_guards import ControlGuards, PendingControl
+from nettracker.routers.control_guards import ConfirmedControl, ControlGuards, PendingControl
 from nettracker.web.sessions import SessionStore
 
 Result = TypeVar("Result")
@@ -45,3 +45,8 @@ class SessionBoundControl(Generic[Result]):
         """Revalidate, then consume once through the guard; never retry execution."""
         session = self._session(cookie)
         return self._guard.confirm(token, session_id=session)
+
+    def confirm_with_request(self, token: str, *, cookie: str | None) -> ConfirmedControl[Result]:
+        """Revalidate the session before returning the confirmed request and result."""
+        session = self._session(cookie)
+        return self._guard.confirm_with_request(token, session_id=session)

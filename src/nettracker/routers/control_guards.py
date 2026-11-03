@@ -22,6 +22,14 @@ class PendingControl:
 
 
 @dataclass(frozen=True)
+class ConfirmedControl(Generic[Result]):
+    """Pair the revalidated server-owned request with its executor result."""
+
+    request: AccessRequest
+    result: Result
+
+
+@dataclass(frozen=True)
 class _Entry:
     pending: PendingControl
     session_id: str
@@ -101,7 +109,15 @@ class ControlGuards(Generic[Result]):
             self._lock.release()
 
     def confirm(self, token: str, *, session_id: str) -> Result:
-        """Consume before execution, including uncertain failures; never retry here."""
+        """Preserve the result-only API; consume once through the shared path."""
+        return self.confirm_with_request(token, session_id=session_id).result
+
+    def confirm_with_request(self, token: str, *, session_id: str) -> ConfirmedControl[Result]:
+        """Consume before execution and return the server-owned action with its result.
+
+        The token is consumed even if revalidation or execution fails. This
+        method does not validate adapter-specific results or retry execution.
+        """
         if not self._lock.acquire(blocking=False):
             raise AccessControlError("another control operation is in progress")
         try:
@@ -115,6 +131,6 @@ class ControlGuards(Generic[Result]):
             current = self._target(pending.device_id, pending.request.blocked)
             if current != pending.request:
                 raise AccessControlError("target changed; a new confirmation is required")
-            return self._execute(current)
+            return ConfirmedControl(current, self._execute(current))
         finally:
             self._lock.release()
