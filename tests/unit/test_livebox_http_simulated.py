@@ -170,6 +170,7 @@ def prepare(client: TestClient, harness: Harness, *, blocked: bool = True) -> ht
             "action": "block" if blocked else "release",
         },
     )
+    assert isinstance(response, httpx.Response)
     assert harness.methods == []
     return response
 
