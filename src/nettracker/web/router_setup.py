@@ -116,8 +116,7 @@ def install_router_setup(
         except (livebox5.LiveboxError, bbox.BboxError):
             raise HTTPException(
                 422,
-                "Adresse refusée : IPv4 privée autorisée et HTTPS, "
-                "ou HTTP accepté explicitement",
+                "Adresse refusée : IPv4 privée autorisée et HTTPS, ou HTTP accepté explicitement",
             ) from None
         if not lock.acquire(blocking=False):
             raise HTTPException(429, "Une lecture de box est déjà en cours")
