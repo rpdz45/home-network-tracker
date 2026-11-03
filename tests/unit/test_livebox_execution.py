@@ -88,9 +88,7 @@ def test_known_failure_is_masked_consumed_and_never_retried(error_type: type[Exc
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize(
-    "result", [None, ControlResult(True, ScheduleState("", "Enable"))]
-)
+@pytest.mark.parametrize("result", [None, ControlResult(True, ScheduleState("", "Enable"))])
 def test_invalid_or_inconsistent_result_cannot_be_presented_as_success(result: object) -> None:
     calls: list[AccessRequest] = []
 

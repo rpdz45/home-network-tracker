@@ -43,9 +43,7 @@ def application(
         calls.append(request)
         if execute is not None:
             return execute(request)
-        return ControlResult(
-            True, ScheduleState("Disable" if request.blocked else "", "Disable")
-        )
+        return ControlResult(True, ScheduleState("Disable" if request.blocked else "", "Disable"))
 
     guard = ControlGuards[object](
         lambda device, blocked: AccessRequest(
