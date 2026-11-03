@@ -16,6 +16,7 @@ from nettracker.routers import bbox
 from nettracker.web.bbox_dashboard import install_bbox_dashboard
 from nettracker.web.fing_dashboard import install_fing_dashboard
 from nettracker.web.livebox_dashboard import install_livebox_dashboard
+from nettracker.web.router_setup import install_router_setup
 
 MAX_FORM_BYTES = 2048
 COOLDOWN_SECONDS = 10
@@ -33,6 +34,7 @@ def install_router_dashboard(
     install_livebox_dashboard(protected, settings, templates)
     install_bbox_dashboard(protected, settings, templates)
     install_fing_dashboard(protected, settings, templates)
+    install_router_setup(protected, settings, templates)
     enabled = os.environ.get("NETTRACKER_BBOX_DIAGNOSTICS_ENABLED") == "true"
     raw_address = os.environ.get("NETTRACKER_BBOX_URL", "")
     allow_http = os.environ.get("NETTRACKER_BBOX_ALLOW_HTTP") == "true"
