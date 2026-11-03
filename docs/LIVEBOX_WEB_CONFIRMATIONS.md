@@ -1,21 +1,64 @@
 # Confirmations web Livebox : liaison aux sessions
 
-Ce premier lot ajoute SessionBoundControl, une composition de SessionStore et ControlGuards. Il ne cree aucune route HTTP, ne modifie pas create_app et n'active aucun bouton ni adaptateur reel. Les tests utilisent une cible Livebox synthetique et un executeur qui ajoute seulement une requete dans une liste memoire.
+## Composant et integration actuelle
 
-Le composant est desactive par defaut. Une activation explicite du composant et du guard est necessaire. prepare et confirm revalident le cookie dans le magasin de sessions avant delegation. Un simple identifiant conserve dans request.state ou un jeton Bearer partage ne remplace pas cette validation. Le composant ne lit pas l'en-tete Authorization.
+SessionBoundControl compose SessionStore et ControlGuards. Le premier lot etait
+isole ; le parcours est maintenant raccorde a create_app et partage exactement
+le magasin de sessions de l'authentification navigateur. Le contrat HTTP courant
+est decrit dans LIVEBOX_HTTP_CONFIRMATIONS.md. Le composant ne cree pas lui-meme
+de routes, ne construit aucun adaptateur et ne lit pas Authorization.
 
-Le guard lie le jeton de confirmation a la session valide, relit la cible et consomme le jeton avant execution. Une autre session ou une nouvelle connexion ne peut pas reprendre le jeton de la premiere. Les sessions revoquees ou expirees sont refusees avant delegation. Les confirmations refusees a ce stade restent dans le guard jusqu'a leur nettoyage habituel ; elles ne deviennent pas utilisables par une nouvelle session.
+Le composant et le guard exigent une activation explicite et restent desactives
+par defaut. prepare, confirm et confirm_with_request revalident le cookie avant
+delegation. request.state ou un Bearer partage ne remplacent pas cette etape.
+
+Le guard lie la confirmation a la session valide, consomme le jeton avant la
+revalidation de cible et l'execution, et ne retente pas. Une autre session ou une
+nouvelle connexion ne peut pas reprendre le jeton. Une mauvaise session ne
+consomme pas celui du proprietaire. Une session revoquee ou expiree est refusee
+avant delegation ; cela ne transfere jamais la confirmation a une autre session.
+
+## Deux API de confirmation
+
+confirm renvoie seulement le resultat et conserve ce contrat generique.
+confirm_with_request renvoie ConfirmedControl[Result], contenant la requete
+revalidee cote serveur et le resultat de l'executeur. Les deux API partagent le
+meme chemin de consommation : un jeton utilise par l'une n'est pas reutilisable
+par l'autre, y compris apres erreur de l'executeur.
+
+Depuis la PR 85, le handler HTTP appelle confirm_livebox_result, qui utilise
+confirm_with_request puis describe_control_result avec l'action de la requete
+renvoyee, jamais une nouvelle action du navigateur. Le succes HTTP exige un
+ControlResult coherent. None ou un resultat invalide produit 409, sans garantie
+d'absence d'effet et sans nouvel essai automatique. Les erreurs connues sont
+masquees ; les exceptions inattendues restent propagees par cette frontiere.
 
 ## Limites importantes
 
-La validation de session est ponctuelle, pas atomique avec une deconnexion concurrente ou l'expiration. Une commande deja admise n'est pas annulee par une revocation ulterieure. Aucun engagement de suppression de cette course concurrente n'est fourni par ce lot. Stockage et verrouillage restent locaux a un seul processus.
+La validation de session est ponctuelle, pas atomique avec une deconnexion ou
+expiration concurrente. Une commande deja admise n'est pas annulee par une
+revocation ulterieure. Stockage et verrouillage restent locaux a un processus.
 
-Le composant est generique : le serveur devra injecter exclusivement le guard Livebox pour les futures routes Livebox. Ni les resolvers, ni les executeurs, ni les secrets ne doivent provenir des formulaires. Il faudra partager exactement le meme SessionStore que l'authentification du dashboard ; ce partage n'est pas encore raccorde dans create_app.
+Le composant generique ne choisit pas le routeur et ne valide pas les resultats
+specifiques Livebox. Le serveur doit injecter un resolver et un executeur qui
+refusent toute cible non Livebox avant effet. Le controle du routeur dans la
+frontiere de resultat, apres execution, ne remplace pas cette protection.
+Resolvers, executeurs, secrets et politique reseau ne proviennent jamais des
+formulaires. HTTP conserve session, CSRF et consentement explicite.
 
-## Validation et suite
+## Validation et prerequis
 
-Tests rediges, non executes par l'assistant : deux sessions distinctes, preparation sans execution, execution unique, refus du rejeu, revocation, nouvelle connexion, expiration de session avant la confirmation, expiration du jeton et desactivation par defaut.
+Les tests synthetiques couvrent sessions distinctes, preparation sans execution,
+execution unique, rejeu, revocation, nouvelle connexion, expirations et activation
+desactivee par defaut. test_livebox_execution.py ajoute la composition du guard
+et des sessions avec validation du resultat et erreurs, sans appel materiel.
+La CI historique de la PR 85 ne vaut pas revue independante ou validation reelle.
 
-Commande : python -m pytest tests/unit/test_session_control.py tests/unit/test_control_guards.py tests/unit/test_web_sessions.py
+```sh
+python -m pytest tests/unit/test_session_control.py tests/unit/test_control_guards.py tests/unit/test_web_sessions.py tests/unit/test_livebox_execution.py
+```
 
-Restent a faire : partage du magasin avec l'authentification, routes prepare/confirm avec CSRF et confirmation de l'appareil/action exacts, rendu des erreurs sans secrets, tests HTTP de deconnexion et d'expiration, validation des cas concurrents, CI Linux/Windows et revue. Aucun test sur box reelle et aucune commande reseau envoyee par ces tests.
+Restent notamment l'examen des cas concurrents, les tests du constructeur reel
+avec transport simule a travers HTTP, la revue independante, l'essai navigateur
+et la validation materielle separee avec accord explicite. Ne pas activer une
+box sur la seule base de ces tests logiciels.
