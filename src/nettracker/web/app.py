@@ -119,10 +119,12 @@ def create_app(
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     templates.env.filters["paris_datetime"] = paris_datetime
     app = FastAPI(title="Home Network Tracker", docs_url=None, redoc_url=None, openapi_url=None)
+    app.state.livebox_control_navigation = False
     sessions = SessionStore()
     require_auth = install_browser_auth(app, expected, sessions=sessions)
     if livebox_control_enabled and livebox_guard is not None:
         install_livebox_confirmation_routes(app, sessions, livebox_guard, enabled=True)
+        app.state.livebox_control_navigation = True
 
     def csrf_for(device_id: int) -> str:
         return hmac.digest(csrf_key, str(device_id).encode(), "sha256").hex()
