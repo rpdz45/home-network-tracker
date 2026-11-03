@@ -62,6 +62,9 @@ footer { margin: 2rem 0; color: var(--muted); font-size: .8rem; }
 <nav aria-label="Navigation principale">
 <a href="/">Appareils</a><a href="/events">Événements</a><a href="/routers">Routeurs</a>
 {% if request is defined and request.state is defined and request.state.browser_session_id is defined %}
+{% if request.app is defined and request.app.state is defined and request.app.state.livebox_control_navigation is defined and request.app.state.livebox_control_navigation is sameas true %}
+<a href="/routers/livebox/control">Contrôle Livebox</a>
+{% endif %}
 <a href="/logout">Se déconnecter</a>
 {% endif %}
 </nav>
