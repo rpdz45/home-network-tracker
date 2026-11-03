@@ -2,10 +2,11 @@
 
 import hmac
 import secrets
-from html import escape
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from nettracker.routers.control import AccessControlError, RouterKind
@@ -18,7 +19,10 @@ PREFIX = "/routers/livebox/control"
 HEADERS = {
     "Cache-Control": "no-store",
     "Referrer-Policy": "no-referrer",
-    "Content-Security-Policy": "default-src 'none'; form-action 'self'; frame-ancestors 'none'",
+    "Content-Security-Policy": (
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; "
+        "base-uri 'none'; frame-ancestors 'none'"
+    ),
     "X-Content-Type-Options": "nosniff",
 }
 
@@ -37,6 +41,7 @@ def install_livebox_confirmation_routes(
     """
     control = SessionBoundControl(sessions, guard, enabled=enabled)
     key = secrets.token_bytes(32)
+    templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
     def session_cookie(request: Request) -> str:
         if enabled is not True:
@@ -46,34 +51,24 @@ def install_livebox_confirmation_routes(
         session = sessions.resolve(request.cookies.get(COOKIE_NAME))
         if session is None:
             raise HTTPException(403, "Session navigateur absente ou expirée")
+        request.state.browser_session_id = session
         return session
 
     def csrf(cookie: str, purpose: str) -> str:
         return hmac.digest(key, f"{cookie}:{purpose}".encode(), "sha256").hex()
 
-    def page(content: str) -> HTMLResponse:
-        return HTMLResponse(
-            '<!doctype html><html lang="fr"><meta charset="utf-8">'
-            "<title>Confirmation Livebox</title><main>" + content + "</main></html>",
+    def page(request: Request, stage: str, context: dict[str, object]) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request,
+            "livebox_confirmation.html",
+            {**context, "stage": stage, "prefix": PREFIX},
             headers=HEADERS,
         )
 
     @app.get(PREFIX)
     def control_form(request: Request) -> HTMLResponse:
         cookie = session_cookie(request)
-        token = csrf(cookie, "prepare")
-        return page(
-            "<h1>Préparer une commande Livebox</h1>"
-            "<p>Aucune commande au simple affichage. Compatibilité matérielle non certifiée.</p>"
-            f'<form method="post" action="{PREFIX}/prepare">'
-            f'<input type="hidden" name="csrf" value="{token}">'
-            "<label>Identifiant local de l'appareil "
-            '<input name="device_id" type="number" min="1" required></label>'
-            '<label>Action <select name="action">'
-            '<option value="block">Bloquer</option>'
-            '<option value="release">Retirer le forçage</option></select></label>'
-            '<button type="submit">Vérifier la cible</button></form>'
-        )
+        return page(request, "prepare", {"csrf": csrf(cookie, "prepare")})
 
     @app.post(PREFIX + "/prepare")
     async def prepare(request: Request) -> HTMLResponse:
@@ -95,22 +90,17 @@ def install_livebox_confirmation_routes(
             raise HTTPException(409, "Préparation refusée ; aucune commande exécutée") from None
         if pending.request.router != RouterKind.LIVEBOX5:
             raise HTTPException(409, "Cible Livebox requise")
-        action = "Bloquer" if pending.request.blocked else "Retirer le forçage"
-        token = escape(pending.token, quote=True)
-        proof = csrf(cookie, "confirm:" + pending.token)
         return page(
-            "<h1>Confirmer la commande Livebox</h1>"
-            f"<p>Appareil local : {pending.device_id}</p>"
-            f"<p>IP : {escape(str(pending.request.address))}</p>"
-            f"<p>MAC : {escape(pending.request.mac)}</p><p>Action : {action}</p>"
-            "<p>Retirer le forçage ne garantit pas l'accès si le calendrier l'interdit.</p>"
-            "<p>Confirmation temporaire, à usage unique. La cible sera revérifiée.</p>"
-            f'<form method="post" action="{PREFIX}/confirm">'
-            f'<input type="hidden" name="csrf" value="{proof}">'
-            f'<input type="hidden" name="token" value="{token}">'
-            '<label><input type="checkbox" name="confirm" value="yes" required>'
-            " Je confirme cette cible et cette action.</label>"
-            '<button type="submit">Confirmer</button></form>'
+            request,
+            "confirm",
+            {
+                "device_id": pending.device_id,
+                "address": str(pending.request.address),
+                "mac": pending.request.mac,
+                "action": "Bloquer" if pending.request.blocked else "Retirer le forçage",
+                "token": pending.token,
+                "csrf": csrf(cookie, "confirm:" + pending.token),
+            },
         )
 
     @app.post(PREFIX + "/confirm")
@@ -127,7 +117,4 @@ def install_livebox_confirmation_routes(
             raise HTTPException(
                 409, "Confirmation refusée ou résultat incertain ; ne pas relancer automatiquement"
             ) from None
-        return page(
-            "<h1>Traitement terminé</h1><p>L'exécuteur configuré a terminé sans erreur.</p>"
-            "<p>Ce message seul ne prouve ni l'accès Internet ni la compatibilité matérielle.</p>"
-        )
+        return page(request, "done", {})

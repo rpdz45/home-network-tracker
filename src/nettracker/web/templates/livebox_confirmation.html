@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Confirmation Livebox · Home Network Tracker{% endblock %}
+{% block content %}
+{% if stage == "prepare" %}
+<h1>Préparer une commande Livebox</h1>
+<p>Aucune commande au simple affichage. Compatibilité matérielle non certifiée.</p>
+<form method="post" action="{{ prefix }}/prepare">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Identifiant local de l'appareil
+<input name="device_id" type="number" min="1" required></label>
+<label>Action <select name="action">
+<option value="block">Bloquer</option>
+<option value="release">Retirer le forçage</option>
+</select></label>
+<button type="submit">Vérifier la cible</button>
+</form>
+{% elif stage == "confirm" %}
+<h1>Confirmer la commande Livebox</h1>
+<p>Appareil local : {{ device_id }}</p>
+<p>IP : {{ address }}</p>
+<p>MAC : {{ mac }}</p>
+<p>Action : {{ action }}</p>
+<p>Retirer le forçage ne garantit pas l'accès si le calendrier l'interdit.</p>
+<p>Confirmation temporaire, à usage unique. La cible sera revérifiée.</p>
+<form method="post" action="{{ prefix }}/confirm">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="token" value="{{ token }}">
+<label><input type="checkbox" name="confirm" value="yes" required>
+Je confirme cette cible et cette action.</label>
+<button type="submit">Confirmer</button>
+</form>
+{% elif stage == "done" %}
+<h1>Traitement terminé</h1>
+<p>L'exécuteur configuré a terminé sans erreur.</p>
+<p>Ce message seul ne prouve ni l'accès Internet ni la compatibilité matérielle.</p>
+{% endif %}
+<p><a href="/routers">Retour aux routeurs</a></p>
+{% endblock %}
