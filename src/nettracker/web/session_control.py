@@ -46,9 +46,7 @@ class SessionBoundControl(Generic[Result]):
         session = self._session(cookie)
         return self._guard.confirm(token, session_id=session)
 
-    def confirm_with_request(
-        self, token: str, *, cookie: str | None
-    ) -> ConfirmedControl[Result]:
+    def confirm_with_request(self, token: str, *, cookie: str | None) -> ConfirmedControl[Result]:
         """Revalidate the session before returning the confirmed request and result."""
         session = self._session(cookie)
         return self._guard.confirm_with_request(token, session_id=session)
