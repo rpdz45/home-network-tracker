@@ -19,8 +19,12 @@ NOW = datetime(2026, 11, 3, 16, 0, tzinfo=UTC)
 
 def collect(**changes: Any) -> DNSObservation:
     arguments: dict[str, Any] = {
-        "ip": "192.168.34.230", "server": "192.168.34.1", "allowed_subnets": SCOPE,
-        "enabled": True, "lookup": lambda *_: ("NAS-CAE.localdomain.",), "clock": lambda: NOW,
+        "ip": "192.168.34.230",
+        "server": "192.168.34.1",
+        "allowed_subnets": SCOPE,
+        "enabled": True,
+        "lookup": lambda *_: ("NAS-CAE.localdomain.",),
+        "clock": lambda: NOW,
     }
     arguments.update(changes)
     return collect_router_dns(**arguments)
@@ -42,16 +46,29 @@ def test_normalized_names_and_provenance() -> None:
     assert result.server == "192.168.34.1"
 
 
-@pytest.mark.parametrize("changes", [
-    {"enabled": False}, {"enabled": 1}, {"enabled": "true"},
-    {"ip": "8.8.8.8"}, {"server": "8.8.8.8"},
-    {"ip": "192.168.35.2"}, {"ip": "example.org"}, {"ip": "192.168.34.0/24"},
-    {"ip": "::1"}, {"allowed_subnets": ()},
-    {"allowed_subnets": (IPv4Network("0.0.0.0/0"),)},
-    {"ip": "192.168.34.255"}, {"server": "192.168.34.0"},
-    {"timeout": 0}, {"timeout": 6}, {"timeout": float("nan")},
-    {"timeout": float("inf")}, {"timeout": True},
-])
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"enabled": False},
+        {"enabled": 1},
+        {"enabled": "true"},
+        {"ip": "8.8.8.8"},
+        {"server": "8.8.8.8"},
+        {"ip": "192.168.35.2"},
+        {"ip": "example.org"},
+        {"ip": "192.168.34.0/24"},
+        {"ip": "::1"},
+        {"allowed_subnets": ()},
+        {"allowed_subnets": (IPv4Network("0.0.0.0/0"),)},
+        {"ip": "192.168.34.255"},
+        {"server": "192.168.34.0"},
+        {"timeout": 0},
+        {"timeout": 6},
+        {"timeout": float("nan")},
+        {"timeout": float("inf")},
+        {"timeout": True},
+    ],
+)
 def test_denied_before_transport(changes: dict[str, Any]) -> None:
     def forbidden(*_: object) -> tuple[str, ...]:
         raise AssertionError("no packets may be emitted")
@@ -75,10 +92,18 @@ def test_failure_has_provenance_without_fallback(status: DNSStatus) -> None:
     assert result.retrieved_at == NOW
 
 
-@pytest.mark.parametrize("name", [
-    "<script>", "a..local", "a\n.local", "-a.local", "a-.local",
-    "a" * 64 + ".local", "a" * 255,
-])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "<script>",
+        "a..local",
+        "a\n.local",
+        "-a.local",
+        "a-.local",
+        "a" * 64 + ".local",
+        "a" * 255,
+    ],
+)
 def test_invalid_answers_are_not_display_names(name: str) -> None:
     result = collect(lookup=lambda *_: (name,))
     assert result.status == "invalid_response"
@@ -100,7 +125,10 @@ def test_timezone_required() -> None:
 
 
 def test_explicit_host_routes() -> None:
-    result = collect(allowed_subnets=(
-        IPv4Network("192.168.34.230/32"), IPv4Network("192.168.34.1/32"),
-    ))
+    result = collect(
+        allowed_subnets=(
+            IPv4Network("192.168.34.230/32"),
+            IPv4Network("192.168.34.1/32"),
+        )
+    )
     assert result.status == "ok"

@@ -47,8 +47,7 @@ def _host(value: str, networks: tuple[IPv4Network, ...]) -> str:
     if not any(address in network for network in networks):
         raise ValueError("host is outside the authorized private scope")
     if any(
-        network.prefixlen < 31
-        and address in (network.network_address, network.broadcast_address)
+        network.prefixlen < 31 and address in (network.network_address, network.broadcast_address)
         for network in networks
     ):
         raise ValueError("network and broadcast addresses are not hosts")
@@ -86,10 +85,7 @@ def _name(raw: str) -> str | None:
     for label in value.split("."):
         if not 1 <= len(label) <= 63 or label.startswith("-") or label.endswith("-"):
             return None
-        if any(
-            character not in "abcdefghijklmnopqrstuvwxyz0123456789-_"
-            for character in label
-        ):
+        if any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for character in label):
             return None
     return value
 

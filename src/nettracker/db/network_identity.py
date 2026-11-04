@@ -11,14 +11,24 @@ from nettracker.errors import DatabaseError
 IdentityField = Literal["hostname", "interface_vendor", "brand", "model", "device_type"]
 IdentitySource = Literal["dns_ptr", "mdns", "ssdp", "ipp", "snmp", "cim", "oui"]
 IdentityStatus = Literal[
-    "reported", "no_record", "timeout", "unavailable", "invalid_response",
-    "access_denied", "not_supported",
+    "reported",
+    "no_record",
+    "timeout",
+    "unavailable",
+    "invalid_response",
+    "access_denied",
+    "not_supported",
 ]
 FIELDS = {"hostname", "interface_vendor", "brand", "model", "device_type"}
 SOURCES = {"dns_ptr", "mdns", "ssdp", "ipp", "snmp", "cim", "oui"}
 STATUSES = {
-    "reported", "no_record", "timeout", "unavailable", "invalid_response",
-    "access_denied", "not_supported",
+    "reported",
+    "no_record",
+    "timeout",
+    "unavailable",
+    "invalid_response",
+    "access_denied",
+    "not_supported",
 }
 
 # Immutable V4 schema: future schema changes require a new migration.
@@ -126,7 +136,8 @@ def save_observations(
                 "SELECT d.mac, d.merged_into, d.status, "
                 "(SELECT s.ip FROM sightings s WHERE s.device_id = d.id "
                 "AND s.source = 'discovery' ORDER BY s.seen_at DESC, s.id DESC LIMIT 1) "
-                "FROM devices d WHERE d.id = ?", (device_id,),
+                "FROM devices d WHERE d.id = ?",
+                (device_id,),
             ).fetchone()
             if (
                 binding is None
@@ -152,9 +163,18 @@ def save_observations(
                     "(device_id, matched_mac, matched_ip, field, source, endpoint, value, "
                     "status, retrieved_at, stored_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                     "ON CONFLICT DO NOTHING",
-                    (device_id, matched_mac, matched_ip, observation.field, observation.source,
-                     observation.endpoint, observation.value, observation.status,
-                     timestamp, stored.isoformat()),
+                    (
+                        device_id,
+                        matched_mac,
+                        matched_ip,
+                        observation.field,
+                        observation.source,
+                        observation.endpoint,
+                        observation.value,
+                        observation.status,
+                        timestamp,
+                        stored.isoformat(),
+                    ),
                 )
                 written += cursor.rowcount
             conn.execute("RELEASE SAVEPOINT network_identity_write")
@@ -181,7 +201,8 @@ def current_observations(
             "WHERE o.device_id = ? AND d.merged_into IS NULL "
             "AND o.matched_ip = (SELECT s.ip FROM sightings s WHERE s.device_id = d.id "
             "AND s.source = 'discovery' ORDER BY s.seen_at DESC, s.id DESC LIMIT 1) "
-            "ORDER BY o.retrieved_at DESC, o.id DESC LIMIT ?", (device_id, limit),
+            "ORDER BY o.retrieved_at DESC, o.id DESC LIMIT ?",
+            (device_id, limit),
         ).fetchall()
     except sqlite3.Error:
         raise DatabaseError("network identity lookup failed") from None

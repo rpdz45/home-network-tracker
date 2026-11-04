@@ -47,8 +47,13 @@ def conn() -> Iterator[sqlite3.Connection]:
 
 def save(conn: sqlite3.Connection, *items: IdentityObservation) -> int:
     return save_observations(
-        conn, device_id=1, matched_mac=MAC, matched_ip=IP,
-        observations=items or (OBS,), confirmed=True, now=NOW,
+        conn,
+        device_id=1,
+        matched_mac=MAC,
+        matched_ip=IP,
+        observations=items or (OBS,),
+        confirmed=True,
+        now=NOW,
     )
 
 
@@ -97,7 +102,11 @@ def test_hardware_observations_have_independent_sources(conn: sqlite3.Connection
     kind = replace(brand, field="device_type", value="Laptop")
     assert save(conn, OBS, brand, model, interface, kind) == 5
     assert {row["field"] for row in current_observations(conn, 1)} == {
-        "hostname", "brand", "model", "interface_vendor", "device_type",
+        "hostname",
+        "brand",
+        "model",
+        "interface_vendor",
+        "device_type",
     }
 
 
@@ -155,7 +164,12 @@ def test_failed_batch_rolls_back_atomically(conn: sqlite3.Connection) -> None:
 def test_confirmation_is_required(conn: sqlite3.Connection) -> None:
     with pytest.raises(ValueError, match="confirmation"):
         save_observations(
-            conn, device_id=1, matched_mac=MAC, matched_ip=IP, observations=(OBS,), now=NOW,
+            conn,
+            device_id=1,
+            matched_mac=MAC,
+            matched_ip=IP,
+            observations=(OBS,),
+            now=NOW,
         )
 
 
@@ -187,8 +201,10 @@ def test_ambiguous_ip_is_refused(conn: sqlite3.Connection) -> None:
     assert current_observations(conn, 1) == []
 
 
-@pytest.mark.parametrize("status", ["no_record", "timeout", "unavailable", "invalid_response",
-                                  "access_denied", "not_supported"])
+@pytest.mark.parametrize(
+    "status",
+    ["no_record", "timeout", "unavailable", "invalid_response", "access_denied", "not_supported"],
+)
 def test_all_failure_statuses_are_recorded(conn: sqlite3.Connection, status: str) -> None:
     assert save(conn, replace(OBS, status=status, value=None)) == 1
     assert current_observations(conn, 1)[0]["status"] == status
@@ -197,6 +213,11 @@ def test_all_failure_statuses_are_recorded(conn: sqlite3.Connection, status: str
 def test_empty_batch_is_refused(conn: sqlite3.Connection) -> None:
     with pytest.raises(ValueError, match="batch"):
         save_observations(
-            conn, device_id=1, matched_mac=MAC, matched_ip=IP, observations=(),
-            confirmed=True, now=NOW,
+            conn,
+            device_id=1,
+            matched_mac=MAC,
+            matched_ip=IP,
+            observations=(),
+            confirmed=True,
+            now=NOW,
         )
