@@ -6,6 +6,7 @@ versions are recorded in ``schema_version``. Never edit a released migration: ad
 
 import sqlite3
 
+from nettracker.db.network_identity import NETWORK_IDENTITY_V4
 from nettracker.errors import DatabaseError
 
 _V1: tuple[str, ...] = (
@@ -108,7 +109,7 @@ _V3: tuple[str, ...] = (
     """,
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3)
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3, NETWORK_IDENTITY_V4)
 LATEST_VERSION = len(MIGRATIONS)
 
 
