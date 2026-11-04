@@ -10,7 +10,9 @@ import pytest
 
 from nettracker.db.network_identity import (
     NETWORK_IDENTITY_V4,
+    IdentityField,
     IdentityObservation,
+    IdentityStatus,
     current_observations,
     save_observations,
 )
@@ -84,7 +86,7 @@ def test_failure_keeps_previous_success(conn: sqlite3.Connection) -> None:
 
 
 @pytest.mark.parametrize("field", ["brand", "model", "device_type", "interface_vendor"])
-def test_dns_cannot_claim_hardware_identity(conn: sqlite3.Connection, field: str) -> None:
+def test_dns_cannot_claim_hardware_identity(conn: sqlite3.Connection, field: IdentityField) -> None:
     with pytest.raises(ValueError, match="DNS PTR"):
         save(conn, replace(OBS, field=field))
     assert current_observations(conn, 1) == []
@@ -205,7 +207,9 @@ def test_ambiguous_ip_is_refused(conn: sqlite3.Connection) -> None:
     "status",
     ["no_record", "timeout", "unavailable", "invalid_response", "access_denied", "not_supported"],
 )
-def test_all_failure_statuses_are_recorded(conn: sqlite3.Connection, status: str) -> None:
+def test_all_failure_statuses_are_recorded(
+    conn: sqlite3.Connection, status: IdentityStatus
+) -> None:
     assert save(conn, replace(OBS, status=status, value=None)) == 1
     assert current_observations(conn, 1)[0]["status"] == status
 
