@@ -2,6 +2,7 @@
 
 import hmac
 import secrets
+from datetime import UTC, datetime
 from threading import Lock
 from time import monotonic
 
@@ -13,7 +14,9 @@ from starlette.concurrency import run_in_threadpool
 
 from nettracker.config import Settings
 from nettracker.routers import bbox, bbox_session, livebox5
+from nettracker.routers.device_names import NameCandidate
 from nettracker.web.browser_auth import _form, _matches
+from nettracker.web.router_name_preview import preview_snapshot
 
 PREFIX = "/routers/setup"
 
@@ -27,11 +30,7 @@ def _text(value: object, secret: str) -> str:
 def install_router_setup(
     protected: APIRouter, settings: Settings, templates: Jinja2Templates
 ) -> None:
-    """Require the parent's browser authentication before accepting a target.
-
-    A saved environment activation is not needed: each POST grants one explicit
-    read within the server-owned subnets. No credentials or profiles are saved.
-    """
+    """Require browser authentication and explicit consent; never save credentials."""
     key = secrets.token_bytes(32)
     lock = Lock()
     attempts: dict[str, float] = {}
@@ -60,6 +59,8 @@ def install_router_setup(
         model: str = "",
         allow_http: bool = False,
         rows: list[dict[str, str]] | None = None,
+        candidates: tuple[NameCandidate, ...] = (),
+        preview_unavailable: bool = False,
         error: bool = False,
         status: int = 200,
     ) -> HTMLResponse:
@@ -74,6 +75,8 @@ def install_router_setup(
                 "allow_http": allow_http,
                 "rows": rows if rows is not None else [],
                 "loaded": rows is not None,
+                "candidates": candidates,
+                "preview_unavailable": preview_unavailable,
                 "error": error,
                 "subnets": [str(network) for network in settings.allowed_subnets],
             },
@@ -130,6 +133,8 @@ def install_router_setup(
             attempts[kind] = monotonic()
             password = SecretStr(form["password"])
             rows: list[dict[str, str]] = []
+            candidates: tuple[NameCandidate, ...] = ()
+            preview_unavailable = False
             try:
                 if kind == "livebox5":
                     snapshot = await run_in_threadpool(
@@ -139,6 +144,10 @@ def install_router_setup(
                         password,
                         enabled=True,
                         allow_http=allow_http,
+                    )
+                    candidates, preview_unavailable = await run_in_threadpool(
+                        preview_snapshot, settings.database_path, snapshot, address,
+                        form["password"], datetime.now(UTC),
                     )
                     for device in snapshot.devices:
                         active = device.get("Active")
@@ -164,6 +173,10 @@ def install_router_setup(
                         confirmed=True,
                         allow_http=allow_http,
                     )
+                    candidates, preview_unavailable = await run_in_threadpool(
+                        preview_snapshot, settings.database_path, bbox_snapshot, address,
+                        form["password"], datetime.now(UTC),
+                    )
                     for host in bbox_snapshot.hosts:
                         state = (
                             "Actif selon la box" if host.active is True else "État non renseigné"
@@ -180,25 +193,15 @@ def install_router_setup(
                         )
             except (livebox5.LiveboxError, bbox.BboxError):
                 return page(
-                    request,
-                    session_id,
-                    kind=kind,
-                    address=address,
-                    model=model,
-                    allow_http=allow_http,
-                    error=True,
-                    status=503,
+                    request, session_id, kind=kind, address=address, model=model,
+                    allow_http=allow_http, error=True, status=503,
                 )
             finally:
                 attempts[kind] = monotonic()
             return page(
-                request,
-                session_id,
-                kind=kind,
-                address=address,
-                model=model,
-                allow_http=allow_http,
-                rows=rows,
+                request, session_id, kind=kind, address=address, model=model,
+                allow_http=allow_http, rows=rows, candidates=candidates,
+                preview_unavailable=preview_unavailable,
             )
         finally:
             lock.release()
