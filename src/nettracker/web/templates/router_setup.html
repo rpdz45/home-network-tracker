@@ -5,7 +5,7 @@
 <h1>Configurer et lire ma box</h1>
 <p>Choisissez votre Livebox 5 ou votre Bbox et renseignez son adresse ici, sans variable à saisir dans le terminal.</p>
 <p>Lecture de l'inventaire uniquement : aucune commande de blocage. Compatibilité matérielle non certifiée.</p>
-<p>Cette première version ne conserve pas les paramètres entre les lectures ou les redémarrages. Le mot de passe n'est pas enregistré et doit être ressaisi.</p>
+<p>Les paramètres ne sont pas conservés entre les lectures ou les redémarrages. Le mot de passe n'est pas enregistré et doit être ressaisi.</p>
 <p>Sous-réseaux autorisés par le serveur : {{ subnets|join(', ') }}. Ce formulaire ne les élargit pas.</p>
 <form method="post" action="/routers/setup/read">
 <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -15,7 +15,7 @@
 </select></label></p>
 <p><label>Adresse d'administration, avec http:// ou https://
 <input name="address" type="url" value="{{ address }}" maxlength="256" required autocomplete="off"></label></p>
-<p class="note">Utilisez l'adresse IPv4 de votre box, sans chemin ni identifiants dans l'URL. Aucun nom de domaine n'est accepté dans ce premier lot.</p>
+<p class="note">Utilisez l'adresse IPv4 de votre box, sans chemin ni identifiants dans l'URL. Aucun nom de domaine n'est accepté.</p>
 <p><label>Modèle exact attendu (Bbox uniquement)
 <input name="model" value="{{ model }}" maxlength="128" autocomplete="off"></label></p>
 <p class="note">La Bbox vérifie le modèle après connexion, pas avant l'envoi du mot de passe. Vérifiez vous-même la cible. Pour Livebox, le compte utilisé est admin.</p>
@@ -37,7 +37,18 @@
 <thead><tr><th>Nom communiqué</th><th>IP</th><th>MAC</th><th>État communiqué</th></tr></thead>
 <tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.ip }}</td><td>{{ row.mac }}</td><td>{{ row.state }}</td></tr>{% else %}<tr><td colspan="4">Aucun appareil communiqué.</td></tr>{% endfor %}</tbody>
 </table></div>
-<p>Ces noms sont affichés uniquement ici. Leur enregistrement dans « Mes appareils » sera un lot distinct ; aucun alias n'a été remplacé. Un état communiqué ne prouve pas la présence actuelle.</p>
+<h2>Prévisualisation des noms associés</h2>
+{% if preview_unavailable %}
+<p role="status">Rapprochement indisponible : base absente ou illisible, ou inventaire incomplet ou invalide. Aucun nom n'a été enregistré.</p>
+{% else %}
+<div class="panel table-scroll"><table>
+<thead><tr><th>Appareil enregistré</th><th>Nom proposé</th><th>IP et MAC associées</th><th>Source</th><th>Date de lecture</th></tr></thead>
+<tbody>{% for candidate in candidates %}
+<tr><td><a href="/devices/{{ candidate.device_id }}">Appareil {{ candidate.device_id }}</a></td><td>{{ candidate.name }}</td><td>{{ candidate.matched_ip }} · {{ candidate.matched_mac }}</td><td>{{ 'Livebox 5' if candidate.source == 'livebox5' else 'Bbox' }}</td><td>{{ candidate.retrieved_at.isoformat() }}</td></tr>
+{% else %}<tr><td colspan="5">Aucun nom éligible avec une correspondance MAC/IP unique dans l'inventaire enregistré.</td></tr>{% endfor %}</tbody>
+</table></div>
 {% endif %}
-<p class="note">Aucune connexion à l'ouverture de cette page, aucune actualisation automatique et aucun stockage dans SQLite.</p>
+<p>Prévisualisation uniquement : aucun nom enregistré dans « Mes appareils » et aucun alias remplacé. Les appareils ignorés ou fusionnés et les associations ambiguës sont exclus. Une correspondance avec la dernière IP de découverte enregistrée ne prouve pas l'identité physique ni la présence actuelle.</p>
+{% endif %}
+<p class="note">Aucune connexion à l'ouverture de cette page, aucune actualisation automatique et aucune écriture dans SQLite.</p>
 {% endblock %}
