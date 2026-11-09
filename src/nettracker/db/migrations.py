@@ -108,7 +108,12 @@ _V3: tuple[str, ...] = (
     """,
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3)
+_V4: tuple[str, ...] = (
+    "ALTER TABLE scans ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0 "
+    "CHECK (degraded IN (0, 1))",
+)
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3, _V4)
 LATEST_VERSION = len(MIGRATIONS)
 
 
