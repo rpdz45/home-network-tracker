@@ -146,8 +146,12 @@ def install_router_setup(
                         allow_http=allow_http,
                     )
                     candidates, preview_unavailable = await run_in_threadpool(
-                        preview_snapshot, settings.database_path, snapshot, address,
-                        form["password"], datetime.now(UTC),
+                        preview_snapshot,
+                        settings.database_path,
+                        snapshot,
+                        address,
+                        form["password"],
+                        datetime.now(UTC),
                     )
                     for device in snapshot.devices:
                         active = device.get("Active")
@@ -174,8 +178,12 @@ def install_router_setup(
                         allow_http=allow_http,
                     )
                     candidates, preview_unavailable = await run_in_threadpool(
-                        preview_snapshot, settings.database_path, bbox_snapshot, address,
-                        form["password"], datetime.now(UTC),
+                        preview_snapshot,
+                        settings.database_path,
+                        bbox_snapshot,
+                        address,
+                        form["password"],
+                        datetime.now(UTC),
                     )
                     for host in bbox_snapshot.hosts:
                         state = (
@@ -193,14 +201,26 @@ def install_router_setup(
                         )
             except (livebox5.LiveboxError, bbox.BboxError):
                 return page(
-                    request, session_id, kind=kind, address=address, model=model,
-                    allow_http=allow_http, error=True, status=503,
+                    request,
+                    session_id,
+                    kind=kind,
+                    address=address,
+                    model=model,
+                    allow_http=allow_http,
+                    error=True,
+                    status=503,
                 )
             finally:
                 attempts[kind] = monotonic()
             return page(
-                request, session_id, kind=kind, address=address, model=model,
-                allow_http=allow_http, rows=rows, candidates=candidates,
+                request,
+                session_id,
+                kind=kind,
+                address=address,
+                model=model,
+                allow_http=allow_http,
+                rows=rows,
+                candidates=candidates,
                 preview_unavailable=preview_unavailable,
             )
         finally:

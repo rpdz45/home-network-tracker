@@ -92,9 +92,7 @@ def test_ambiguous_router_reports(conn: sqlite3.Connection, other: RouterName) -
 
 
 def test_ping_does_not_change_discovery_binding(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        "INSERT INTO sightings VALUES (2, 1, '192.168.1.99', 'ping', '2026-01-02')"
-    )
+    conn.execute("INSERT INTO sightings VALUES (2, 1, '192.168.1.99', 'ping', '2026-01-02')")
     assert len(preview(conn, RouterName(MAC, "192.168.1.20", "Salon"))) == 1
 
 

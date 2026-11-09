@@ -36,13 +36,16 @@ def test_preview_preserves_database(tmp_path: Path, kind: str) -> None:
     snapshot: LiveboxSnapshot | BboxSnapshot
     if kind == "livebox5":
         snapshot = LiveboxSnapshot(
-            "Livebox 5", None,
+            "Livebox 5",
+            None,
             ({"PhysAddress": MAC, "IPAddress": "192.168.1.20", "Name": "Salon"},),
         )
     else:
         snapshot = BboxSnapshot(
-            "synthetic", None,
-            (BboxHost(1, "Salon", "192.168.1.20", MAC, True, None),), True,
+            "synthetic",
+            None,
+            (BboxHost(1, "Salon", "192.168.1.20", MAC, True, None),),
+            True,
         )
     candidates, unavailable = preview_snapshot(
         path, snapshot, "https://192.168.1.1", "synthetic-credential", datetime.now(UTC)
@@ -58,8 +61,11 @@ def test_preview_preserves_database(tmp_path: Path, kind: str) -> None:
 def test_missing_database_is_not_created(tmp_path: Path) -> None:
     path = tmp_path / "absent.db"
     result = preview_snapshot(
-        path, LiveboxSnapshot("Livebox 5", None, ()),
-        "https://192.168.1.1", "synthetic-credential", datetime.now(UTC),
+        path,
+        LiveboxSnapshot("Livebox 5", None, ()),
+        "https://192.168.1.1",
+        "synthetic-credential",
+        datetime.now(UTC),
     )
     assert result == ((), True)
     assert not path.exists()
@@ -68,8 +74,11 @@ def test_missing_database_is_not_created(tmp_path: Path) -> None:
 def test_invalid_snapshot_is_unavailable(tmp_path: Path) -> None:
     path = tmp_path / "absent.db"
     result = preview_snapshot(
-        path, LiveboxSnapshot("Livebox 5", None, ({"Name": "Salon"},)),
-        "https://192.168.1.1", "synthetic-credential", datetime.now(UTC),
+        path,
+        LiveboxSnapshot("Livebox 5", None, ({"Name": "Salon"},)),
+        "https://192.168.1.1",
+        "synthetic-credential",
+        datetime.now(UTC),
     )
     assert result == ((), True)
     assert not path.exists()
@@ -81,8 +90,11 @@ def test_unprepared_database_is_not_migrated(tmp_path: Path) -> None:
     conn.close()
     before = path.read_bytes()
     result = preview_snapshot(
-        path, LiveboxSnapshot("Livebox 5", None, ()),
-        "https://192.168.1.1", "synthetic-credential", datetime.now(UTC),
+        path,
+        LiveboxSnapshot("Livebox 5", None, ()),
+        "https://192.168.1.1",
+        "synthetic-credential",
+        datetime.now(UTC),
     )
     assert result == ((), True)
     assert path.read_bytes() == before

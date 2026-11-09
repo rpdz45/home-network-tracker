@@ -58,9 +58,7 @@ def test_livebox_invalid_binding_rejects_batch(device: dict[str, str]) -> None:
 
 
 def test_bbox_missing_ip_rejects_batch() -> None:
-    snapshot = BboxSnapshot(
-        "synthetic", None, (BboxHost(1, "Salon", None, MAC, True, None),), True
-    )
+    snapshot = BboxSnapshot("synthetic", None, (BboxHost(1, "Salon", None, MAC, True, None),), True)
     with pytest.raises(ValueError):
         bbox_names(snapshot)
 
