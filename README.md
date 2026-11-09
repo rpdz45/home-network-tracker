@@ -8,7 +8,7 @@ Disponibles : configuration validée, découverte passive, ARP actif expliciteme
 
 Le dashboard M5 est disponible : liste et fiche des appareils, événements, santé du collecteur, alias/type, marquage comme connu et historique ICMP 24 h / 7 jours. Les graphiques agrègent les sondes de la fenêtre en 96 créneaux, sans dépendre des 25 observations du tableau. Une identification Fing optionnelle est aussi disponible : lecture explicite de l’API locale, stockage local après confirmation et affichage historique sur la fiche appareil.
 
-Restent notamment à livrer ou valider : démarrage et reprise automatiques en service, notifiers Discord/Telegram/e-mail, règles avancées, déploiement M6 et tests sur matériel réel. Le ratio réponses/sondes n’est pas un uptime temporel ; les créneaux sans mesure restent inconnus. La feuille de route de [AGENTS.md](AGENTS.md) reste la référence : les jalons complets ne sont pas déclarés terminés par cette liste.
+Restent notamment à livrer ou valider : démarrage et reprise automatiques en service, notifiers Telegram et e-mail (Discord est disponible, voir [docs/M4_ALERTS.md](docs/M4_ALERTS.md), non testé contre un vrai webhook), règles avancées, déploiement M6 et tests sur matériel réel. Le ratio réponses/sondes n’est pas un uptime temporel ; les créneaux sans mesure restent inconnus. La feuille de route de [AGENTS.md](AGENTS.md) reste la référence : les jalons complets ne sont pas déclarés terminés par cette liste.
 
 ## Avertissement et prérequis
 

@@ -2,7 +2,16 @@
 
 ## Périmètre
 
-Transformer les événements stockés en lignes `notifications`, avec anti-spam, mode `dry-run`, un délai avant d'alerter sur un appareil hors ligne et une détection de latence soutenue. **Aucun envoi réseau n'existe encore** : les notifiers (Discord, Telegram, e-mail) arrivent dans un lot suivant. Aucune migration : seules les tables `events`, `notifications`, `sightings` et `scans` du schéma existant sont utilisées.
+Transformer les événements stockés en lignes `notifications`, avec anti-spam, mode `dry-run`, un délai avant d'alerter sur un appareil hors ligne et une détection de latence soutenue. Le lot 3 ajoute le **notifier Discord** (seul canal réel pour l'instant ; Telegram et e-mail arrivent dans un lot suivant). Aucune migration : seules les tables `events`, `notifications`, `sightings` et `scans` du schéma existant sont utilisées.
+
+## Notifier Discord (lot 3)
+
+1. Dans Discord : paramètres du salon, Intégrations, Webhooks, nouveau webhook, copier l'URL.
+2. Dans `.env` (jamais dans `config.toml`) : `NETTRACKER_DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...`
+3. Vérifier : `nettracker check-config` affiche `alerts.discord: webhook set` sans montrer l'URL.
+4. Tester d'abord en `dry_run = true`, puis passer `dry_run = false` dans `[alerts]`.
+
+Détails : un message par alerte (`POST` JSON), préfixé par la gravité, tronqué à 2000 caractères, avec `allowed_mentions` vide (un nom d'appareil ne peut pas déclencher `@everyone`). L'URL doit être en `https` sur `discord.com`, `ptb.discord.com`, `canary.discord.com` ou `discordapp.com` avec un chemin `/api/webhooks/` ; toute autre valeur est refusée au chargement de la config, sans afficher l'URL. Redirections non suivies, délai configurable (`alerts.discord.timeout_seconds`, 5 s). En cas d'échec, seul le type d'erreur (ou le code HTTP) est conservé : l'URL n'apparaît ni dans les journaux, ni dans la base, ni dans les exceptions.
 
 ## Fonctionnement
 
@@ -50,11 +59,16 @@ offline_after_minutes = 5  # délai avant une alerte hors ligne (0 à 1440 ; 0 =
 latency_high_ms = 200      # seuil de latence moyenne (1 à 60000)
 ```
 
-Avec `dry_run = false` et aucun notifier configuré (c'est le cas pour l'instant), la commande refuse de s'exécuter avec une erreur claire avant toute écriture.
+```toml
+[alerts.discord]
+timeout_seconds = 5.0      # délai HTTP d'un message (1 à 30) ; l'URL du webhook va dans .env
+```
+
+Avec `dry_run = false` et aucun notifier configuré (pas de webhook Discord), la commande refuse de s'exécuter avec une erreur claire avant toute écriture.
 
 ## Sécurité
 
-- Aucun accès réseau, aucun secret lu ou écrit. Les futurs notifiers liront leurs secrets dans `.env` uniquement.
+- Le moteur lui-même n'a aucun accès réseau. Le notifier Discord n'est construit qu'en mode réel (`dry_run = false`) ; son secret est lu dans `.env` uniquement, stocké en `SecretStr` et jamais affiché.
 - Les messages contiennent l'alias ou le nom d'hôte et la MAC de l'appareil : ce sont des données du foyer, qui ne quitteront la machine que vers les canaux choisis par le propriétaire (règle 11 d'`AGENTS.md`).
 - Le journal ne contient que l'identifiant et le type de l'événement, pas le texte du message.
 - La détection de latence ne lit que des échantillons déjà stockés : elle n'envoie aucune sonde.
@@ -63,13 +77,18 @@ Avec `dry_run = false` et aucun notifier configuré (c'est le cas pour l'instant
 
 `tests/unit/test_alerts.py` et `tests/unit/test_cli_alerts.py` (lot 1) : dry-run, types traités, anti-spam, échecs, limites, commande. `tests/unit/test_alert_rules.py` (lot 2, SQLite en mémoire, horloge injectée) : alerte hors ligne retardée puis déclenchée à l'échéance, délai nul, délai réservé à `offline`, annulation par un `online` ultérieur du même appareil (et pas par un autre appareil ni un `online` antérieur), latence soutenue, un événement par épisode, réarmement, échantillons insuffisants, seuil strict, sondes sans réponse, échantillons anciens, seuil invalide, enchainement détection puis envoi, message de latence.
 
+`tests/unit/test_discord_notifier.py` (lot 3, transport `httpx.MockTransport`) : format du message et absence de mentions, troncature, erreurs HTTP et de transport sans fuite de l'URL, validation de l'URL du webhook, lecture depuis l'environnement, enregistrement `sent` / `failed` par notifier, commande en mode réel, jamais de notifier construit en dry-run.
+
 ```bash
-pytest tests/unit/test_alerts.py tests/unit/test_alert_rules.py tests/unit/test_cli_alerts.py -vv
+pytest tests/unit/test_alerts.py tests/unit/test_alert_rules.py tests/unit/test_cli_alerts.py \
+  tests/unit/test_discord_notifier.py -vv
 ```
 
 ## Limites connues
 
-- Aucun notifier réel : le mode réel n'est pas utilisable avant le lot suivant.
+- Seul Discord est livré : pas encore de Telegram ni d'e-mail.
+- Le notifier Discord n'a **pas été testé contre un vrai webhook** : les tests utilisent un transport HTTP simulé (aucun paquet réel). À valider chez toi avec un salon de test.
+- Pas de nouvelle tentative après un échec (dont le code 429 de limitation de débit de Discord) : l'événement est enregistré `failed` et n'est pas renvoyé.
 - Une alerte hors ligne n'est examinée qu'à l'échéance du délai et seulement quand `process-alerts` tourne : le retard réel dépend de ta planification. L'appareil qui revient puis repart dans le délai produit deux `offline` ; le premier est annulé (`recovered`), le second suit son propre délai.
 - Le nombre d'échantillons (3) et la fenêtre de fraîcheur (60 minutes) de la latence sont des constantes, non configurables.
 - La commande n'affiche pas le nombre d'événements `latency_high` créés (le compte est dans le résumé interne) ; ils sont consultables dans la table `events`.

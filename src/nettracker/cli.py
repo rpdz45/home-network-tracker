@@ -11,6 +11,7 @@ import uvicorn
 
 from nettracker import __version__
 from nettracker.alerts.engine import process_pending_events
+from nettracker.alerts.notifiers import build_notifiers
 from nettracker.config import Settings, load_settings
 from nettracker.db import Repository, connect, migrate
 from nettracker.db.health import collector_health, record_stale_event
@@ -36,7 +37,7 @@ COMMANDS = {
     "health-check": "Report collector health; record a collector_stale event once per outage.",
     "init-db": "Create or upgrade the SQLite database schema.",
     "monitor-once": "Measure ICMP reachability for explicitly selected discovered devices.",
-    "process-alerts": "Record alerts for new events (dry-run by default; nothing is sent).",
+    "process-alerts": "Record alerts for new events (dry-run by default; sends if dry_run=false).",
     "prune-history": "Preview or delete old ping samples (preview only unless authorized).",
     "scan-once": "Discover scoped neighbors once and save observations.",
     "serve": "Serve the read-only local dashboard (loopback unless configured).",
@@ -121,6 +122,8 @@ def _check_config(settings: Settings) -> int:
         f"alerts: dry_run={str(settings.alerts.dry_run).lower()} "
         f"cooldown_minutes={settings.alerts.cooldown_minutes}"
     )
+    discord_state = "set" if settings.alerts.discord.webhook_url is not None else "not set"
+    print(f"alerts.discord: webhook {discord_state}")
     print(f"api: {settings.api.host}:{settings.api.port} (token: {token_state})")
     return 0
 
@@ -168,7 +171,8 @@ def _process_alerts(settings: Settings) -> int:
     conn = connect(settings.database_path)
     try:
         migrate(conn)
-        summary = process_pending_events(conn, settings.alerts, datetime.now(UTC))
+        notifiers = [] if settings.alerts.dry_run else build_notifiers(settings.alerts)
+        summary = process_pending_events(conn, settings.alerts, datetime.now(UTC), notifiers)
     finally:
         conn.close()
     mode = "dry-run" if settings.alerts.dry_run else "live"
