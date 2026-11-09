@@ -20,6 +20,8 @@ _PROBLEMS_SQL = (
     "SELECT started_at, finished_at, status, error FROM scans "
     "WHERE status != 'ok' ORDER BY id DESC LIMIT ?"
 )
+_SCAN_COLUMNS_SQL = "PRAGMA table_info(scans)"
+_LAST_DEGRADED_SQL = "SELECT degraded FROM scans WHERE status = 'ok' ORDER BY id DESC LIMIT 1"
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,7 @@ class CollectorHealth:
     age_seconds: float | None
     stale: bool
     recent_problems: tuple[ScanProblem, ...]
+    last_scan_degraded: bool | None = None
 
 
 def _query(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> list[Any]:
@@ -45,6 +48,15 @@ def _query(conn: sqlite3.Connection, sql: str, params: tuple[Any, ...] = ()) -> 
         return conn.execute(sql, params).fetchall()
     except sqlite3.Error as exc:
         raise DatabaseError(f"cannot read collector health: {exc}") from exc
+
+
+def _last_scan_degraded(conn: sqlite3.Connection) -> bool | None:
+    """Flag of the latest successful scan; None if unknown (no scan or an older schema)."""
+    columns = {row[1] for row in _query(conn, _SCAN_COLUMNS_SQL)}
+    if "degraded" not in columns:
+        return None
+    rows = _query(conn, _LAST_DEGRADED_SQL)
+    return bool(rows[0][0]) if rows else None
 
 
 def collector_health(
@@ -69,7 +81,7 @@ def collector_health(
         for row in _query(conn, _PROBLEMS_SQL, (problem_limit,))
     )
     stale = age is not None and age > stale_after_seconds
-    return CollectorHealth(last_success, age, stale, problems)
+    return CollectorHealth(last_success, age, stale, problems, _last_scan_degraded(conn))
 
 
 def record_stale_event(
