@@ -34,6 +34,28 @@ Détails : un message par alerte (`POST` JSON), préfixé par la gravité, tronq
 
 Un événement `offline` n'est pris en compte qu'une fois plus ancien que `alerts.offline_after_minutes` (5 par défaut ; 0 = immédiat). Tant qu'il est plus récent, il reste en attente sans occuper la limite par exécution. À l'échéance, s'il existe un événement `online` **plus récent pour le même appareil**, l'appareil est revenu : la ligne est enregistrée en `suppressed` avec l'erreur `recovered` et aucune alerte n'est produite. Un `online` d'un autre appareil, ou antérieur, n'annule rien.
 
+## Reprise du collecteur avant envoi
+
+Un événement `collector_stale` en attente est annulé s’il existe un scan de
+statut `ok` dont `finished_at` est **strictement postérieur** à la création de
+cet événement et **inférieur ou égal** à l’instant injecté de traitement.
+Le scan peut avoir commencé avant l’événement : c’est sa fin réussie qui compte.
+Un scan en erreur, refusé, non terminé, ancien, au même instant que l’événement
+ou daté dans le futur ne suffit pas à prouver une reprise.
+
+Le moteur enregistre une seule notification `suppressed`, canal `all`, raison
+`recovered`, sans appeler aucun notifier, en mode réel comme en `dry-run`.
+L’événement et les scans sont conservés ; une relance ne les traite pas à nouveau.
+Cette suppression ne démarre aucun délai anti-spam. Un nouvel événement de panne
+postérieur au succès reste éligible, selon les règles de délai déjà existantes.
+Une reprise n’annule pas rétroactivement une notification déjà envoyée.
+
+La vérification lit seulement les données locales déjà stockées. Elle ne lance
+ni scan, ni ping, ni tâche de fond et ne crée pas d’événement de panne :
+`health-check` reste distinct. Le résultat vaut pour l’état lu au traitement ;
+une reprise enregistrée après cette lecture peut arriver trop tard pour annuler
+un envoi en cours. Aucun verrou n’est conservé pendant un appel de notifier.
+
 ## Latence élevée
 
 Pour chaque appareil ayant un échantillon ping récent (moins de 60 minutes), la moyenne de ses **3 derniers échantillons ayant répondu** est comparée à `alerts.latency_high_ms` (200 par défaut). Au-dessus du seuil (comparaison stricte), un événement `latency_high` est créé avec la moyenne dans ses détails. Un seul événement par épisode : tant qu'aucun échantillon à ou sous le seuil n'a été vu depuis le dernier événement, rien de nouveau n'est créé. Un échantillon normal réarme la règle. Les sondes sans réponse sont ignorées (elles relèvent de `offline`). Ces échantillons n'existent que si tu lances `monitor-once` (double opt-in).
@@ -41,7 +63,7 @@ Pour chaque appareil ayant un échantillon ping récent (moins de 60 minutes), l
 ## Statuts enregistrés
 
 - `dry_run` : mode par défaut (`alerts.dry_run = true`). Rien n'est envoyé, aucun notifier n'est appelé ; canal `dry-run`.
-- `suppressed` : canal `all`, erreur `cooldown` (anti-spam) ou `recovered` (appareil revenu).
+- `suppressed` : canal `all`, erreur `cooldown` (anti-spam) ou `recovered` (appareil revenu ou collecteur ayant repris).
 - `sent` / `failed` : mode réel, un enregistrement par notifier. En cas d'échec, seul le **nom du type d'exception** est stocké (jamais le message, qui pourrait contenir un secret). Un envoi échoué n'est pas réessayé dans ce lot.
 
 ## Anti-spam
@@ -83,6 +105,13 @@ Avec `dry_run = false` et aucun notifier configuré (pas de webhook Discord), la
 pytest tests/unit/test_alerts.py tests/unit/test_alert_rules.py tests/unit/test_cli_alerts.py \
   tests/unit/test_discord_notifier.py -vv
 ```
+
+Tests de reprise : `pytest tests/unit/test_collector_alert_recovery.py -q`.
+SQLite temporaire en mémoire, instants injectés et notifiers factices : reprise
+avant envoi, dry-run sans appel, bornes temporelles, refus/échecs/scans non terminés,
+plusieurs canaux, conservation de l’historique et traitement unique, limite par
+exécution, nouvelle panne après reprise et cycle complet `record_stale_event`.
+Aucun test ne contacte Discord ou le réseau domestique.
 
 ## Limites connues
 
