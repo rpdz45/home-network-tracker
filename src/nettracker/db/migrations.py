@@ -109,8 +109,7 @@ _V3: tuple[str, ...] = (
 )
 
 _V4: tuple[str, ...] = (
-    "ALTER TABLE scans ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0 "
-    "CHECK (degraded IN (0, 1))",
+    "ALTER TABLE scans ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0 CHECK (degraded IN (0, 1))",
 )
 
 MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3, _V4)
