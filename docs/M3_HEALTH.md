@@ -16,6 +16,17 @@ Un outil de surveillance qui tombe en panne sans prévenir est pire que pas d'ou
 
 Un seul événement `collector_stale` est créé par période de panne. Tant que le dernier `collector_stale` est plus récent que le dernier scan réussi, rien de nouveau n'est écrit, même si la commande est relancée. Le premier scan réussi suivant réarme la règle : une nouvelle panne produit un nouvel événement. La vérification et l'écriture se font dans une transaction.
 
+## Alerte après reprise
+
+`health-check` ne notifie toujours pas directement. Si `process-alerts` traite
+un événement `collector_stale` après une reprise enregistrée, le moteur le marque
+`suppressed`, raison `recovered`, sans envoi.
+Le succès doit s’être terminé strictement après la création de l’événement et
+au plus tard à l’instant de traitement. Un succès daté dans le futur, un simple
+début de scan ou un scan en erreur ne prouvent pas une reprise. L’événement reste dans
+l’historique ; une nouvelle panne est réarmée par le succès comme auparavant.
+Voir [M4_ALERTS.md](M4_ALERTS.md#reprise-du-collecteur-avant-envoi).
+
 ## Configuration
 
 ```toml
