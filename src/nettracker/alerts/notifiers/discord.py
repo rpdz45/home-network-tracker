@@ -5,6 +5,7 @@ Failures raise ``NotifierError`` with a fixed text (plus the HTTP status code wh
 """
 
 import logging
+import re
 
 import httpx
 
@@ -15,6 +16,38 @@ logger = logging.getLogger(__name__)
 
 MAX_CONTENT_LENGTH = 2000
 _SEVERITY_PREFIX = {"critical": "🔴", "warning": "🟠", "info": "🔵"}
+
+
+# HTTPX logs the full request URL at INFO; HTTPCore can log the target at DEBUG.
+# Redact the entire credential-bearing path, without retaining any actual secret.
+_WEBHOOK_PATH = re.compile(r"/api/webhooks/[^\s\"'<>]+", re.IGNORECASE)
+_HTTP_LOGGERS = (
+    "httpx",
+    "httpcore.connection",
+    "httpcore.http11",
+    "httpcore.http2",
+    "httpcore.proxy",
+    "httpcore.socks",
+)
+
+
+class _WebhookLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        text = record.getMessage()
+        redacted = _WEBHOOK_PATH.sub("/api/webhooks/[redacted]", text)
+        if redacted != text:
+            record.msg = redacted
+            record.args = ()
+        return True
+
+
+_WEBHOOK_LOG_FILTER = _WebhookLogFilter()
+
+
+def _protect_webhook_logs() -> None:
+    for name in _HTTP_LOGGERS:
+        # addFilter is idempotent for the same filter object.
+        logging.getLogger(name).addFilter(_WEBHOOK_LOG_FILTER)
 
 
 class DiscordNotifier:
@@ -29,6 +62,7 @@ class DiscordNotifier:
         timeout_seconds: float = 5.0,
         client: httpx.Client | None = None,
     ) -> None:
+        _protect_webhook_logs()
         self._webhook_url = webhook_url
         self._timeout = timeout_seconds
         self._client = client
