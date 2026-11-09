@@ -41,9 +41,7 @@ def finished_scan(repo: Repository, started_at: datetime, *, degraded: bool) -> 
 
 
 def settings_for(path: Path) -> Settings:
-    return Settings.model_validate(
-        {"allowed_subnets": ["192.168.1.0/24"], "database_path": path}
-    )
+    return Settings.model_validate({"allowed_subnets": ["192.168.1.0/24"], "database_path": path})
 
 
 def home_page(path: Path) -> str:
@@ -207,6 +205,7 @@ def test_scan_once_records_whether_the_fallback_was_used(
     conn = connect(database)
     try:
         row = conn.execute("SELECT mode, degraded FROM scans").fetchone()
-        assert (row["mode"], row["degraded"]) == ("passive" if degraded else "active", int(degraded))
+        expected_mode = "passive" if degraded else "active"
+        assert (row["mode"], row["degraded"]) == (expected_mode, int(degraded))
     finally:
         conn.close()
