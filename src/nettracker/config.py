@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from ipaddress import IPv4Network, ip_address
 from pathlib import Path
 from typing import Any, Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import (
     BaseModel,
@@ -36,6 +37,7 @@ ENV_OVERRIDES: dict[str, tuple[str, ...]] = {
     "NETTRACKER_API_TOKEN": ("api", "token"),
     "NETTRACKER_DATABASE_PATH": ("database_path",),
     "NETTRACKER_LOG_LEVEL": ("log_level",),
+    "NETTRACKER_DISCORD_WEBHOOK_URL": ("alerts", "discord", "webhook_url"),
 }
 
 
@@ -87,6 +89,34 @@ class HealthSettings(_Model):
     stale_after_minutes: int = Field(default=15, ge=1, le=10_080)
 
 
+DISCORD_WEBHOOK_HOSTS = frozenset(
+    {"discord.com", "ptb.discord.com", "canary.discord.com", "discordapp.com"}
+)
+
+
+class DiscordSettings(_Model):
+    """Discord webhook. The URL is a secret: set it in ``.env``, never in the TOML file."""
+
+    webhook_url: SecretStr | None = None
+    timeout_seconds: float = Field(default=5.0, ge=1.0, le=30.0, allow_inf_nan=False)
+
+    @field_validator("webhook_url")
+    @classmethod
+    def check_webhook_url(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None or not value.get_secret_value():
+            return None
+        parsed = urlsplit(value.get_secret_value())
+        # Refuse anything that is not a Discord webhook, so a typo or a hostile config cannot
+        # make the tool post alert text (device names, MACs) to an arbitrary server.
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in DISCORD_WEBHOOK_HOSTS
+            or not parsed.path.startswith("/api/webhooks/")
+        ):
+            raise ValueError("alerts.discord.webhook_url must be an https Discord webhook URL")
+        return value
+
+
 class AlertSettings(_Model):
     """Alert settings. Dry-run is the default: nothing is sent until it is turned off."""
 
@@ -95,6 +125,7 @@ class AlertSettings(_Model):
     max_events_per_run: int = Field(default=200, ge=1, le=1000)
     offline_after_minutes: int = Field(default=5, ge=0, le=1440)
     latency_high_ms: int = Field(default=200, ge=1, le=60_000)
+    discord: DiscordSettings = Field(default_factory=DiscordSettings)
 
 
 def _is_loopback(host: str) -> bool:

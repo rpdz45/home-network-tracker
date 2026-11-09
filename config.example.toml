@@ -51,7 +51,8 @@ stale_after_minutes = 15
 
 [alerts]
 # While true, `nettracker process-alerts` only records dry-run rows: nothing is ever sent.
-# false needs a configured notifier (none exists yet), otherwise the command refuses to run.
+# false needs a configured notifier (Discord: set NETTRACKER_DISCORD_WEBHOOK_URL in .env),
+# otherwise the command refuses to run.
 dry_run = true
 # Same event kind on the same device alerts at most once per this many minutes (1 to 1440).
 cooldown_minutes = 30
@@ -62,6 +63,12 @@ max_events_per_run = 200
 offline_after_minutes = 5
 # Alert when the mean of the last 3 answered pings exceeds this many ms (1 to 60000).
 latency_high_ms = 200
+
+[alerts.discord]
+# The webhook URL is a secret: put it in .env as NETTRACKER_DISCORD_WEBHOOK_URL, NOT here.
+# Only https://discord.com/api/webhooks/... style URLs are accepted.
+# HTTP timeout for one message, in seconds (1 to 30).
+timeout_seconds = 5.0
 
 [api]
 # Keep loopback unless you set NETTRACKER_API_TOKEN in .env.
