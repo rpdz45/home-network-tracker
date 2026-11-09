@@ -3,6 +3,10 @@
 {% set error_labels = {'PermissionError': 'Permission refusée', 'TimeoutError': 'Délai dépassé', 'OSError': 'Erreur système', 'DatabaseError': 'Erreur de base de données', 'ValueError': 'Données invalides'} %}
 <section aria-labelledby="collector-problems-title">
 <h2 id="collector-problems-title">Problèmes récents de découverte</h2>
+{% if health.last_scan_degraded|default(none) %}
+<p class="badge warn">Dernière collecte réussie : mode dégradé</p>
+<p class="note">La découverte active n'a pas pu fonctionner comme demandé ; un repli a été utilisé et les résultats peuvent être incomplets. Ce n'est ni une panne de la box ni une intrusion. La commande scan-once indique la source exacte dans sa sortie et ses journaux.</p>
+{% endif %}
 <p class="note">Jusqu'à cinq scans non réussis enregistrés, du plus récent au plus ancien. Cet historique ne prouve pas une panne actuelle ; une collecte réussie ultérieure peut déjà avoir rétabli la découverte.</p>
 {% if problems %}
 <div class="panel table-scroll" role="region" aria-label="Historique des problèmes de découverte" tabindex="0">
