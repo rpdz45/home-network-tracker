@@ -41,6 +41,9 @@ _RECENT_SQL = (
 _RECOVERED_SQL = (
     "SELECT 1 FROM events o WHERE o.kind = 'online' AND o.device_id = ? AND o.id > ? LIMIT 1"
 )
+_COLLECTOR_RECOVERED_SQL = (
+    "SELECT 1 FROM scans WHERE status = 'ok' AND finished_at > ? AND finished_at <= ? LIMIT 1"
+)
 _DEVICE_SQL = "SELECT alias, hostname, mac FROM devices WHERE id = ?"
 
 _TEXTS: dict[str, str] = {
@@ -118,10 +121,16 @@ def _build_message(
     return AlertMessage(event_id, kind, SEVERITY[kind], text)
 
 
-def _suppression_reason(conn: sqlite3.Connection, row: Any, cooldown: timedelta) -> str | None:
+def _suppression_reason(
+    conn: sqlite3.Connection, row: Any, cooldown: timedelta, now: datetime
+) -> str | None:
     """Return why a pending event must not alert (``recovered`` or ``cooldown``), if any."""
     event_id, device_id, kind, _, created_at = row
     if kind == "offline" and _fetch(conn, _RECOVERED_SQL, (device_id, event_id)):
+        return "recovered"
+    if kind == "collector_stale" and _fetch(
+        conn, _COLLECTOR_RECOVERED_SQL, (created_at, to_iso(now))
+    ):
         return "recovered"
     cutoff = to_iso(datetime.fromisoformat(created_at) - cooldown)
     if _fetch(conn, _RECENT_SQL, (kind, device_id, event_id, cutoff)):
@@ -152,7 +161,7 @@ def process_pending_events(
     sent = dry_run = suppressed = failed = 0
     for row in rows:
         event_id, device_id, kind, raw_details, _ = row
-        reason = _suppression_reason(conn, row, cooldown)
+        reason = _suppression_reason(conn, row, cooldown, now)
         if reason is not None:
             repo.add_notification(
                 event_id=event_id,
