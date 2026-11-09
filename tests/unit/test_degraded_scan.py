@@ -177,9 +177,18 @@ def test_dashboard_hides_the_note_after_a_normal_scan(tmp_path: Path) -> None:
     assert MARKER not in home_page(path)
 
 
-def test_dashboard_still_loads_on_a_version_3_database(tmp_path: Path) -> None:
+def test_dashboard_refuses_a_version_3_database_until_it_is_migrated(tmp_path: Path) -> None:
     path = tmp_path / "legacy-web.db"
     legacy_connection(path).close()
+    with TestClient(create_app(settings_for(path), clock=lambda: NOW)) as client:
+        response = client.get("/")
+    assert response.status_code == 503
+    assert MARKER not in response.text
+    conn = connect(path)
+    try:
+        migrate(conn)
+    finally:
+        conn.close()
     assert MARKER not in home_page(path)
 
 
