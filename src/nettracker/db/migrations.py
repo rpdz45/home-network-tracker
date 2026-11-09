@@ -108,7 +108,23 @@ _V3: tuple[str, ...] = (
     """,
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3)
+_V4: tuple[str, ...] = (
+    """
+    CREATE TABLE router_name_observations (
+        device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+        source TEXT NOT NULL CHECK (source IN ('livebox5', 'bbox')),
+        endpoint TEXT NOT NULL CHECK (length(endpoint) BETWEEN 7 AND 15),
+        matched_mac TEXT NOT NULL,
+        matched_ip TEXT NOT NULL,
+        reported_name TEXT NOT NULL CHECK (length(reported_name) BETWEEN 1 AND 128),
+        retrieved_at TEXT NOT NULL,
+        stored_at TEXT NOT NULL,
+        PRIMARY KEY (device_id, source)
+    )
+    """,
+)
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3, _V4)
 LATEST_VERSION = len(MIGRATIONS)
 
 
