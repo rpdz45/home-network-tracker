@@ -53,5 +53,32 @@ pytest tests/unit/test_health.py tests/unit/test_cli_health.py -vv
 - Seuls les scans de découverte sont suivis. `monitor-once` n'écrit pas dans `scans` : une panne du suivi ICMP n'est pas détectée ici.
 - Un collecteur qui n'a jamais réussi un scan n'est pas déclaré périmé ; ses échecs apparaissent dans les problèmes récents.
 - Si l'horloge de la machine recule, l'ancienneté peut être négative et le collecteur n'est pas déclaré périmé.
-- Pas de bloc « santé » dans le dashboard (M5 non commencé) : cette commande en est la source de données.
+- Le dashboard affiche la fraîcheur et les cinq derniers problèmes de découverte en lecture seule ; il ne remplace pas la commande `health-check` et ne crée pas lui-même d’événement de panne.
 - Aucune validation sur matériel ou sur une exécution de plusieurs jours.
+
+## Problèmes récents dans le dashboard
+
+La page `/` réutilise la lecture `collector_health` existante et affiche jusqu’à
+cinq scans non réussis, du plus récent au plus ancien (ordre des identifiants
+de scans). Dates de début et de fin en heure de Paris, état « Échec » ou
+« Refusé » ; sans date de fin, « Non terminé à la lecture », qui peut signifier
+en cours ou interrompu, pas nécessairement un échec.
+
+Les catégories sont fermées : permission refusée, délai dépassé, erreur système,
+erreur de base de données et données invalides. Une erreur absente ou inconnue
+devient « Erreur de collecte (détail masqué) ». Le champ d’erreur brut n’est jamais
+affiché, même pour une ancienne base contenant un message détaillé. Une date
+invalide est remplacée par le libellé du formateur de dates existant.
+
+Cet historique reste visible même sans collecte réussie ou après reprise.
+L’absence de problème enregistré ne prouve pas que le collecteur fonctionne.
+La fraîcheur reste calculée indépendamment selon le dernier succès et le seuil
+configuré (15 minutes par défaut, inchangé). Aucune migration, nouvelle route,
+collecte, écriture de base ou notification lors d’un GET. L’authentification et
+les en-têtes de sécurité du dashboard sont conservés.
+
+Validation hors ligne : `pytest tests/unit/test_web_collector_problems.py -q`.
+Tests HTTP en processus, base temporaire synthétique, horloge injectée :
+historique vide, succès seul, catégories, scan non terminé ou refusé, limite
+à cinq, fraîcheur indépendante, détails sensibles absents du HTML, lecture
+sans modification SQLite et authentification. Aucun test LAN ou navigateur réel.

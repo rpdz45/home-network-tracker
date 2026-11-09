@@ -17,6 +17,7 @@
 <p class="badge {{ 'ok' if monitoring_enabled else 'warn' }}">Suivi configuré : {{ 'activé' if monitoring_enabled else 'désactivé' }}</p>
 <p class="note">La configuration ne prouve pas que la boucle de suivi fonctionne actuellement. Sans nouvelle collecte réussie, les observations vieillissent, même si cette page reste ouverte.</p>
 </section>
+{% include "collector_problems.html" %}
 {{ information_guide() }}
 <div class="panel table-scroll" role="region" aria-label="Liste des appareils" tabindex="0">
 <table>
