@@ -6,7 +6,7 @@ Après installation et configuration d’allowed_subnets : nettracker init-db --
 
 ## Pages et modifications
 
-/ affiche jusqu’à 500 appareils non fusionnés et la santé du collecteur. /devices/{id} affiche la fiche, les 25 dernières observations et événements, le formulaire et le graphique temporel. /events liste les 100 événements récents. /login accepte le jeton partagé.
+/ affiche jusqu’à 500 appareils non fusionnés, la fraîcheur de la découverte et les cinq derniers problèmes de collecte (état et catégorie sans détail brut). Cet historique ne prouve pas une panne actuelle et ne déclenche aucune action ; voir [M3_HEALTH.md](M3_HEALTH.md#problèmes-récents-dans-le-dashboard). /devices/{id} affiche la fiche, les 25 dernières observations et événements, le formulaire et le graphique temporel. /events liste les 100 événements récents. /login accepte le jeton partagé.
 
 Sans jeton configuré, les pages restent consultables sur loopback mais les écritures sont refusées (403). Avec NETTRACKER_API_TOKEN configuré, les pages exigent Bearer ou le cookie HttpOnly/SameSite=Strict de /login. Sans identifiants : redirection /login ; Bearer incorrect : 401. Une exposition hors loopback est refusée par la configuration sans jeton.
 

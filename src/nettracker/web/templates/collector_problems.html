@@ -1,0 +1,31 @@
+{# Read-only history: never render raw error strings or infer a current outage. #}
+{% set problems = health.recent_problems|default(()) %}
+{% set error_labels = {'PermissionError': 'Permission refusée', 'TimeoutError': 'Délai dépassé', 'OSError': 'Erreur système', 'DatabaseError': 'Erreur de base de données', 'ValueError': 'Données invalides'} %}
+<section aria-labelledby="collector-problems-title">
+<h2 id="collector-problems-title">Problèmes récents de découverte</h2>
+<p class="note">Jusqu'à cinq scans non réussis enregistrés, du plus récent au plus ancien. Cet historique ne prouve pas une panne actuelle ; une collecte réussie ultérieure peut déjà avoir rétabli la découverte.</p>
+{% if problems %}
+<div class="panel table-scroll" role="region" aria-label="Historique des problèmes de découverte" tabindex="0">
+<table>
+<thead><tr><th scope="col">Début (heure de Paris)</th><th scope="col">Fin enregistrée (heure de Paris)</th><th scope="col">État enregistré</th><th scope="col">Catégorie</th></tr></thead>
+<tbody id="collector-problems">
+{% for problem in problems %}
+<tr>
+<td>{{ problem.started_at|paris_datetime }}</td>
+<td>{{ problem.finished_at|paris_datetime }}</td>
+{% if not problem.finished_at %}
+<td>Non terminé à la lecture</td><td>En cours ou interrompu — état inconnu</td>
+{% else %}
+<td>{{ 'Refusé' if problem.status == 'denied' else 'Échec' }}</td>
+<td>{{ error_labels.get(problem.error, 'Erreur de collecte (détail masqué)') }}</td>
+{% endif %}
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% else %}
+<p>Aucun problème de découverte enregistré.</p>
+{% endif %}
+<p class="note">Seuls les scans de découverte sont concernés, pas les mesures ICMP. Les détails bruts des erreurs ne sont pas affichés. Actualiser cette page ne lance aucune collecte, notification ou réparation.</p>
+</section>
