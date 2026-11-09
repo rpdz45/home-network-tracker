@@ -29,6 +29,7 @@ def collect_observations(
     vendors: Mapping[str, str] | None = None,
     hostname_lookup: HostnameLookup | None = None,
     known_devices: Collection[str] = (),
+    degraded: bool = False,
 ) -> int:
     """Persist scoped observations; name resolution is opt-in and called after scope checks."""
     if not allowed_subnets:
@@ -37,7 +38,7 @@ def collect_observations(
         raise ValueError("unsupported discovery mode")
     known_macs = normalize_known_devices(known_devices)
     resolved_vendors = vendors if vendors is not None else load_local_registry()
-    scan_id = repo.start_scan(mode=mode, started_at=clock())
+    scan_id = repo.start_scan(mode=mode, started_at=clock(), degraded=degraded)
     try:
         neighbors = reader(allowed_subnets)
         with repo.transaction():

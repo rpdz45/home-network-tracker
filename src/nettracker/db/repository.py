@@ -225,11 +225,13 @@ class Repository:
         mode: ScanMode,
         started_at: datetime,
         subnet: str | None = None,
+        degraded: bool = False,
     ) -> int:
         _require(mode, _SCAN_MODES, "scan mode")
         return self._insert(
-            "INSERT INTO scans (started_at, mode, subnet, status) VALUES (?, ?, ?, 'error')",
-            (to_iso(started_at), mode, subnet),
+            "INSERT INTO scans (started_at, mode, subnet, status, degraded) "
+            "VALUES (?, ?, ?, 'error', ?)",
+            (to_iso(started_at), mode, subnet, int(degraded)),
         )
 
     def finish_scan(

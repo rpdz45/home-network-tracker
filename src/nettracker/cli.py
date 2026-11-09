@@ -298,6 +298,7 @@ def _scan_once(
                 vendors=vendors,
                 hostname_lookup=lookup if resolve_names or resolve_mdns else None,
                 known_devices=settings.known_devices,
+                degraded=result.degraded,
             )
         finally:
             conn.close()
