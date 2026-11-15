@@ -20,6 +20,7 @@ from nettracker.config import Settings
 from nettracker.db import Repository, connect
 from nettracker.db.device_edits import DEVICE_TYPES, mark_known, update_identity
 from nettracker.db.health import CollectorHealth, collector_health
+from nettracker.db.network_identity import current_observations
 from nettracker.errors import NetTrackerError
 from nettracker.routers.control_guards import ControlGuards
 from nettracker.web import queries
@@ -115,7 +116,7 @@ def create_app(
     """
     expected = _expected_credential(settings)
     if type(livebox_control_enabled) is not bool:
-        raise ValueError("livebox_control_enabled must be a bool")
+        raise ValueError("Livebox control requires a credential and a server-owned guard")
     if livebox_control_enabled and (expected is None or livebox_guard is None):
         raise ValueError("Livebox control requires a credential and a server-owned guard")
     csrf_key = secrets.token_bytes(32)
@@ -189,6 +190,7 @@ def create_app(
                 "csrf": csrf_for(device_id) if expected is not None else "",
                 "device_types": sorted(DEVICE_TYPES),
                 "series": load_series(conn, device_id, clock(), window),
+                "identity_observations": current_observations(conn, device_id),
             }
         return templates.TemplateResponse(request, "device.html", context)
 

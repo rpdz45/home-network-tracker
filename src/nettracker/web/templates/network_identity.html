@@ -1,0 +1,27 @@
+{% set dns_rows = identity_observations|default([])|selectattr('source', 'equalto', 'dns_ptr')|list %}
+{% set dns_statuses = {'no_record': 'Aucun nom retourné', 'timeout': 'Délai dépassé', 'unavailable': 'Serveur indisponible', 'invalid_response': 'Réponse inexploitable'} %}
+<section aria-labelledby="network-identity-title">
+<h2 id="network-identity-title">Noms DNS enregistrés</h2>
+<p class="note">Source : DNS inverse (PTR) du serveur local choisi. Une déclaration DNS ne prouve ni la marque, ni le modèle, ni une présence actuelle. L'alias manuel reste inchangé.</p>
+{% if dns_rows %}
+<div class="panel table-scroll" role="region" aria-label="Historique DNS enregistré" tabindex="0">
+<table>
+<thead><tr><th scope="col">Nom ou résultat</th><th scope="col">Serveur DNS</th><th scope="col">Récupération · Paris</th><th scope="col">Stockage · Paris</th></tr></thead>
+<tbody>
+{% for observation in dns_rows %}
+<tr>
+<td>{% if observation['status'] == 'reported' %}{{ observation['value'] }}{% else %}{{ dns_statuses.get(observation['status'], 'Résultat indisponible') }}{% endif %}</td>
+<td><code>{{ observation['endpoint'] }}</code></td>
+<td>{{ observation['retrieved_at']|paris_datetime }}</td>
+<td>{{ observation['stored_at']|paris_datetime }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<p class="note">Observations du rattachement MAC/IP actuellement enregistré, dans la limite des 100 dernières informations d'identité. Un échec récent n'efface pas un ancien nom ; les dates permettent de les distinguer.</p>
+{% else %}
+<p>Aucune observation DNS enregistrée pour le rattachement actuel de cet appareil.</p>
+{% endif %}
+<p class="note">Cette page consulte uniquement la base locale. Son actualisation ne lance aucune requête DNS. La collecte est déclenchée séparément par la commande identify-dns.</p>
+</section>
