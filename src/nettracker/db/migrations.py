@@ -6,6 +6,7 @@ versions are recorded in ``schema_version``. Never edit a released migration: ad
 
 import sqlite3
 
+from nettracker.db.network_identity import NETWORK_IDENTITY_V4
 from nettracker.errors import DatabaseError
 
 _V1: tuple[str, ...] = (
@@ -112,7 +113,10 @@ _V4: tuple[str, ...] = (
     "ALTER TABLE scans ADD COLUMN degraded INTEGER NOT NULL DEFAULT 0 CHECK (degraded IN (0, 1))",
 )
 
-MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3, _V4)
+# The existing constant names the original proposal, not its installed schema version.
+_V5: tuple[str, ...] = NETWORK_IDENTITY_V4
+
+MIGRATIONS: tuple[tuple[str, ...], ...] = (_V1, _V2, _V3, _V4, _V5)
 LATEST_VERSION = len(MIGRATIONS)
 
 

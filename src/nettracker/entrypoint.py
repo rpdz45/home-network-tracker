@@ -1,4 +1,4 @@
-"""CLI entrypoint; isolate discovery pruning while delegating existing commands."""
+"""CLI entrypoint; delegate explicit identity and discovery retention commands."""
 
 import argparse
 import sqlite3
@@ -51,9 +51,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         from nettracker.cli import build_parser
 
         parser = build_parser()
-        parser.epilog = "Additional command: prune-discovery (use prune-discovery --help)."
+        parser.epilog = "Additional commands: prune-discovery, identify-dns (use COMMAND --help)."
         parser.print_help()
         return 0 if arguments else 2
+    if arguments[0] == "identify-dns":
+        from nettracker.identity_cli import main as identity_main
+
+        return identity_main(arguments[1:])
     if arguments[0] != "prune-discovery":
         from nettracker.cli import main as existing_main
 

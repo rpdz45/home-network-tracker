@@ -38,6 +38,7 @@
 <p class="note">Données historiques : ni preuve de présence actuelle, ni date du dernier scan. L'IP affichée est celle du rapprochement au stockage, pas une garantie de l'IP actuelle. Cette lecture ne contacte pas Fing et ne rafraîchit pas l'identification.</p>
 </section>
 {% endif %}
+{% include "network_identity.html" %}
 {{ information_guide() }}
 {% if can_edit %}
 <section aria-labelledby="edit-title">
